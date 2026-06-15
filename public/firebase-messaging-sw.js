@@ -1,3 +1,4 @@
+// Firebase SDKs
 importScripts(
   "https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"
 );
@@ -16,16 +17,17 @@ firebase.initializeApp({
   measurementId: "G-CDEVT1SFKH"
 });
 
+// Yaha hum service worker ke default showNotification function ko override kar rahe hain
+// Taki Firebase jab bhi default notification dikhaye, usme automatically hamara favicon lag jaye
+const originalShowNotification = self.registration.showNotification;
+self.registration.showNotification = function(title, options) {
+  if (!options) options = {};
+  options.icon = '/favicon.ico'; // Forcefully add favicon
+  return originalShowNotification.call(this, title, options);
+};
+
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  console.log("Background Message:", payload);
-
-  self.registration.showNotification(
-    payload.notification?.title || "Notification",
-    {
-      body: payload.notification?.body,
-      icon: "/favicon.ico",
-    }
-  );
+  console.log("Background Data Message:", payload);
 });
