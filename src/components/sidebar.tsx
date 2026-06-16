@@ -32,6 +32,23 @@ type ListItem = {
   order?: number;
 };
 
+type UserInfo = {
+  id: string;
+  name?: string;
+  email?: string;
+};
+
+const getTokenPayload = (): UserInfo | null => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) return null;
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload || null;
+  } catch {
+    return null;
+  }
+};
+
 export default function Sidebar() {
   const router       = useRouter();
   const pathname     = usePathname();
@@ -46,53 +63,45 @@ export default function Sidebar() {
   const [newListName, setNewListName]           = useState("");
   const [creating, setCreating]                 = useState(false);
   const [createError, setCreateError]           = useState<string | null>(null);
+  const [userInfo, setUserInfo]                 = useState<UserInfo | null>(null);
 
   useEffect(() => {
-  const token = localStorage.getItem("token");
-  if (!token) return;
+    const payload = getTokenPayload();
+    setUserInfo(payload);
 
-  let userId: string | null = null;
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    userId = payload.id || null;
-  } catch (e) {
-    return;
-  }
+    if (!payload?.id) return;
 
-  if (!userId) return;
+    let cancelled = false;
+    setLoadingLists(true);
+    getListsByUserApi(payload.id)
+      .then((res) => {
+        if (!cancelled) {
+          const lists = res.data.data || [];
+          setUserLists(lists);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch user lists:", err);
+        if (!cancelled) setUserLists([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingLists(false);
+      });
 
-  let cancelled = false;
-  setLoadingLists(true);
-  getListsByUserApi(userId)
-    .then((res) => {
-      if (!cancelled) {
-        const lists = res.data.data || [];
-        setUserLists(lists);
-      }
-    })
-    .catch((err) => {
-      console.error("Failed to fetch user lists:", err);
-      if (!cancelled) setUserLists([]);
-    })
-    .finally(() => {
-      if (!cancelled) setLoadingLists(false);
-    });
+    return () => { cancelled = true; };
+  }, [pathname]);
 
-  return () => { cancelled = true; };
-}, [pathname]); // ← [] ni jagye [pathname] karo
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    router.push("/login");
+  };
 
   const handleCreateList = async () => {
     const trimmed = newListName.trim();
     if (!trimmed) return;
 
-    let userId: string | null = null;
-    try {
-      const token = localStorage.getItem("token");
-      if (token) {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        userId = payload.id || null;
-      }
-    } catch (e) {}
+    const payload = getTokenPayload();
+    const userId  = payload?.id || null;
 
     setCreating(true);
     setCreateError(null);
@@ -130,6 +139,11 @@ export default function Sidebar() {
 
   const toggleListChecked = (id: string) =>
     setCheckedLists((p) => ({ ...p, [id]: !p[id] }));
+
+  // User display info
+  const displayName  = userInfo?.name  || "User";
+  const displayEmail = userInfo?.email || "";
+  const firstLetter  = displayName.charAt(0).toUpperCase();
 
   if (pathname === "/login") return null;
 
@@ -283,14 +297,17 @@ export default function Sidebar() {
       <div className="px-3 py-3 border-t border-gray-100 space-y-0.5">
         <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
           <div className="w-8 h-8 rounded-full bg-[#E7F8F1] flex items-center justify-center text-[#00A884] text-xs font-bold shrink-0">
-            A
+            {firstLetter}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-gray-800 text-xs font-semibold truncate">Admin</p>
-            <p className="text-gray-400 text-[10px] truncate">Admin@gmail.com</p>
+            <p className="text-gray-800 text-xs font-semibold truncate">{displayName}</p>
+            <p className="text-gray-400 text-[10px] truncate">{displayEmail}</p>
           </div>
         </div>
-        <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors cursor-pointer">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+        >
           <LogOut className="w-[17px] h-[17px]" />
           <span>Logout</span>
         </button>
