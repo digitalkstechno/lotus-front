@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useChecklist } from "../context";
+import { ArrowLeft } from "lucide-react";
+
 
 function InlineField({ label, value, onChange, type = "text", placeholder = "Click to edit..." }) {
   const [editing, setEditing] = useState(false);
@@ -146,8 +148,8 @@ export default function AddChecklist() {
     <div className="min-h-screen bg-[#f8fafc]">
       <div className="bg-emerald-700 text-white px-4 py-3 flex items-center gap-3 sticky top-0 z-20 shadow-md">
         <button onClick={() => router.push("/checklist/records")}
-          className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center text-lg flex-shrink-0">
-          ←
+          className="p-1.5 rounded-full bg-white/20 text-white flex items-center justify-center text-lg flex-shrink-0">
+          <ArrowLeft className="w-4 h-4" />
         </button>
         <div className="flex-1">
           <p className="font-semibold text-sm leading-tight">New Checklist Record</p>
@@ -162,11 +164,11 @@ export default function AddChecklist() {
 
           <div className="bg-emerald-50 text-white px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <p className="font-semibold text-emerald-700 text-sm">Secondary Warehouse – Self Assessment Checklist</p>
+              <p className="font-semibold text-emerald-50 text-emerald-700 text-sm">Secondary Warehouse – Self Assessment Checklist</p>
               <p className="text-xs opacity-80 text-emerald-700 mt-1">Assessment Period: {periodStr}</p>
             </div>
             <button onClick={handleSave} disabled={saving}
-              className="text-white bg-emerald-600 text-xs font-semibold px-4 py-1.5 rounded-lg shadow hover:bg-emerald-50 transition-colors disabled:opacity-60 flex-shrink-0">
+              className="text-white bg-emerald-600 text-xs font-semibold px-4 py-1.5 rounded-lg shadow transition-colors disabled:opacity-60 flex-shrink-0">
               {savedMsg ? "✓ Saved" : "💾 Save"}
             </button>
           </div>

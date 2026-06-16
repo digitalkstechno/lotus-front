@@ -2,6 +2,8 @@
 
 import { useRouter, useParams } from "next/navigation";
 import { useChecklist } from "../../context";
+import { ArrowLeft } from "lucide-react";
+
 
 export default function ViewRecord() {
   const router = useRouter();
@@ -45,8 +47,8 @@ export default function ViewRecord() {
       {/* Top Bar */}
       <div className="bg-emerald-700 text-white px-4 py-3 flex items-center gap-3 sticky top-0 z-20 shadow-md">
         <button onClick={() => router.push("/checklist")}
-          className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center text-lg flex-shrink-0">
-          ←
+          className="p-1.5 rounded-full bg-white/20 text-white flex items-center justify-center text-lg flex-shrink-0">
+          <ArrowLeft className="w-4 h-4" />
         </button>
         <div className="flex-1">
           <p className="font-semibold text-sm leading-tight">Record #{record.slipNo}</p>
@@ -61,7 +63,7 @@ export default function ViewRecord() {
         <div className="bg-white rounded-tr-xl rounded-b-xl overflow-hidden shadow-md">
 
           {/* Bubble header */}
-          <div className="bg-emerald-700 text-white px-4 py-3">
+          <div className="bg-emerald-50 text-emerald-700 px-4 py-3">
             <p className="font-semibold text-sm">Secondary Warehouse – Self Assessment Checklist</p>
             <p className="text-xs opacity-80 mt-1">Assessment Period: {periodStr}</p>
           </div>

@@ -39,7 +39,7 @@ export default function ChecklistRecords() {
         </div>
         <button
           onClick={() => router.push("/checklist/add")}
-          className="w-20 h-7 rounded-full bg-emerald-500 flex items-center justify-center text-[15px] flex-shrink-0"
+          className="gap-2 px-6 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 font-semibold text-white cursor-pointer transition-colors text-[13px] flex items-center justify-center flex-shrink-0"
           title="Add new record"
         >
          + Add

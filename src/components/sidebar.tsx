@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
-  CheckCircle2,
   Plus,
   Star,
   ChevronDown,
@@ -12,30 +11,125 @@ import {
   Users,
   ClipboardList,
   MessageSquare,
-  LayoutDashboard,
-  Bell,
-  FileText,
   Settings,
   LogOut,
+  X,
+  Loader2,
 } from "lucide-react";
+import { getListsByUserApi, createListApi } from "../services/listService";
 
 const PRIMARY_NAV = [
-  { id: "task",      label: "Task",       icon: ClipboardList,   path: "/task" },
-  { id: "starred",   label: "Starred",    icon: Star,            path: "/" },
-  { id: "checklist", label: "Checklist",  icon: ListChecks,      path: "/checklist" },
-  { id: "staff",     label: "Staff",      icon: Users,           path: "/staff" },
-  { id: "settings", label: "Settings",   icon: Settings,        path: "/settings" },
+  { id: "task",      label: "Task",       icon: ClipboardList, path: "/task" },
+  { id: "starred",   label: "Starred",    icon: Star,          path: "/" },
+  { id: "checklist", label: "Checklist",  icon: ListChecks,    path: "/checklist" },
+  { id: "staff",     label: "Staff",      icon: Users,         path: "/staff" },
+  { id: "settings",  label: "Settings",   icon: Settings,      path: "/settings" },
 ];
 
-export default function Sidebar() {
-  const router   = useRouter();
-  const pathname = usePathname();
-  const [listsOpen, setListsOpen] = useState(true);
+type ListItem = {
+  _id: string;
+  name: string;
+  order?: number;
+};
 
-  const isActive = (path: string) => path === "/checklist/records"
-    ? pathname.startsWith("/checklist")
-    : pathname === path;
-  const handleCreateNewList = () => router.push("/task?newList=1");
+export default function Sidebar() {
+  const router       = useRouter();
+  const pathname     = usePathname();
+  const searchParams = useSearchParams();
+  const activeListId = searchParams.get("list_id");
+
+  const [listsOpen, setListsOpen]               = useState(true);
+  const [checkedLists, setCheckedLists]         = useState<Record<string, boolean>>({});
+  const [userLists, setUserLists]               = useState<ListItem[]>([]);
+  const [loadingLists, setLoadingLists]         = useState(false);
+  const [showNewListInput, setShowNewListInput] = useState(false);
+  const [newListName, setNewListName]           = useState("");
+  const [creating, setCreating]                 = useState(false);
+  const [createError, setCreateError]           = useState<string | null>(null);
+
+  useEffect(() => {
+  const token = localStorage.getItem("token");
+  if (!token) return;
+
+  let userId: string | null = null;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    userId = payload.id || null;
+  } catch (e) {
+    return;
+  }
+
+  if (!userId) return;
+
+  let cancelled = false;
+  setLoadingLists(true);
+  getListsByUserApi(userId)
+    .then((res) => {
+      if (!cancelled) {
+        const lists = res.data.data || [];
+        setUserLists(lists);
+      }
+    })
+    .catch((err) => {
+      console.error("Failed to fetch user lists:", err);
+      if (!cancelled) setUserLists([]);
+    })
+    .finally(() => {
+      if (!cancelled) setLoadingLists(false);
+    });
+
+  return () => { cancelled = true; };
+}, [pathname]); // ← [] ni jagye [pathname] karo
+
+  const handleCreateList = async () => {
+    const trimmed = newListName.trim();
+    if (!trimmed) return;
+
+    let userId: string | null = null;
+    try {
+      const token = localStorage.getItem("token");
+      if (token) {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        userId = payload.id || null;
+      }
+    } catch (e) {}
+
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const res = await createListApi({
+        name: trimmed,
+        ...(userId ? { user_id: userId } : {}),
+      });
+      const created: ListItem = res.data?.data || res.data;
+      setUserLists((prev) => [...prev, created]);
+      setShowNewListInput(false);
+      setNewListName("");
+      router.push(`/task?list_id=${created._id}`);
+    } catch (err: any) {
+      console.error("Failed to create list:", err);
+      setCreateError(err?.response?.data?.message || "Could not create list.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleNewListKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") handleCreateList();
+    if (e.key === "Escape") {
+      setShowNewListInput(false);
+      setNewListName("");
+      setCreateError(null);
+    }
+  };
+
+  const isActive = (path: string) =>
+    path === "/checklist/records"
+      ? pathname.startsWith("/checklist")
+      : pathname === path;
+
+  const toggleListChecked = (id: string) =>
+    setCheckedLists((p) => ({ ...p, [id]: !p[id] }));
 
   if (pathname === "/login") return null;
 
@@ -56,7 +150,7 @@ export default function Sidebar() {
         </button>
       </div>
 
-      {/* ── Nav items ── */}
+      {/* ── Nav ── */}
       <div className="flex-1 overflow-y-auto py-3">
         <nav className="px-3 space-y-0.5">
           {PRIMARY_NAV.map((item) => {
@@ -94,24 +188,92 @@ export default function Sidebar() {
 
           {listsOpen && (
             <div className="mt-0.5 ml-3 pl-3 border-l border-gray-100 space-y-0.5">
+
+              {/* My Tasks */}
               <button
                 onClick={() => router.push("/task")}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
-                  pathname === "/task"
+                  pathname === "/task" && !activeListId
                     ? "text-[#00A884] bg-[#E7F8F1]"
                     : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
                 }`}
               >
-                <span className="w-2 h-2 rounded-full bg-[#00A884] shrink-0" />
-                <span>My Tasks</span>
+                <input
+                  type="checkbox"
+                  checked={!!checkedLists["my-tasks"]}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() => toggleListChecked("my-tasks")}
+                  className="w-3.5 h-3.5 rounded border-gray-300 text-[#00A884] focus:ring-[#00A884] cursor-pointer shrink-0"
+                />
+                <span className="truncate">My Tasks</span>
               </button>
-              <button
-                onClick={handleCreateNewList}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-50 hover:text-[#00A884] transition-colors cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5 shrink-0" />
-                <span>Create new list</span>
-              </button>
+
+              {/* User na lists */}
+              {loadingLists ? (
+                <p className="px-3 py-2 text-[11px] text-gray-300 italic">Loading lists…</p>
+              ) : (
+                userLists.map((list) => (
+                  <button
+                    key={list._id}
+                    onClick={() => router.push(`/task?list_id=${list._id}`)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
+                      activeListId === list._id
+                        ? "text-[#00A884] bg-[#E7F8F1]"
+                        : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!checkedLists[list._id]}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => toggleListChecked(list._id)}
+                      className="w-3.5 h-3.5 rounded border-gray-300 text-[#00A884] focus:ring-[#00A884] cursor-pointer shrink-0"
+                    />
+                    <span className="truncate">{list.name}</span>
+                  </button>
+                ))
+              )}
+
+              {/* Create new list */}
+              {showNewListInput ? (
+                <div className="px-3 pt-1.5 pb-1 space-y-1">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={newListName}
+                    onChange={(e) => { setNewListName(e.target.value); setCreateError(null); }}
+                    onKeyDown={handleNewListKeyDown}
+                    placeholder="List name…"
+                    className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-1 focus:ring-[#00A884] focus:border-[#00A884]"
+                  />
+                  {createError && (
+                    <p className="text-[11px] text-red-400">{createError}</p>
+                  )}
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={handleCreateList}
+                      disabled={creating || !newListName.trim()}
+                      className="flex-1 flex items-center justify-center gap-1 text-xs font-medium py-1.5 rounded-md bg-[#00A884] text-white disabled:opacity-50 hover:bg-[#009070] transition-colors"
+                    >
+                      {creating ? <Loader2 className="w-3 h-3 animate-spin" /> : "Create"}
+                    </button>
+                    <button
+                      onClick={() => { setShowNewListInput(false); setNewListName(""); setCreateError(null); }}
+                      className="p-1.5 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowNewListInput(true)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-50 hover:text-[#00A884] transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5 shrink-0" />
+                  <span>Create new list</span>
+                </button>
+              )}
             </div>
           )}
         </div>
