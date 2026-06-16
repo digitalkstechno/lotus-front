@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   Circle,
@@ -111,7 +111,23 @@ const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 /* ---------------------------------------------------------
    Calendar Component (dark theme, like images)
 --------------------------------------------------------- */
-const CalendarPicker = ({ value, onChange, onClose, showTimeRepeat = false, onSetTime, onSetRepeat, onDelete }) => {
+const CalendarPicker = ({
+  value,
+  onChange,
+  onClose,
+  showTimeRepeat = false,
+  onSetTime,
+  onSetRepeat,
+  onDelete
+}: {
+  value: any;
+  onChange: any;
+  onClose: any;
+  showTimeRepeat?: boolean;
+  onSetTime?: any;
+  onSetRepeat?: any;
+  onDelete?: any;
+}) => {
   const today = new Date();
   const initDate = value ? new Date(value) : today;
   const [viewYear, setViewYear] = useState(initDate.getFullYear());
@@ -396,7 +412,21 @@ const Overlay = ({ onClose }) => (
   <div className="fixed inset-0 z-40" onClick={onClose} />
 );
 
-const MenuItem = ({ icon: Icon, children, onClick, danger, disabled, sub }) => (
+const MenuItem = ({
+  icon: Icon,
+  children,
+  onClick,
+  danger,
+  disabled,
+  sub
+}: {
+  icon?: any;
+  children: React.ReactNode;
+  onClick?: (e: any) => void;
+  danger?: boolean;
+  disabled?: boolean;
+  sub?: string;
+}) => (
   <button
     onClick={onClick}
     disabled={disabled}
@@ -495,7 +525,7 @@ const formatDueLabel = (task) => {
 /* ---------------------------------------------------------
    App
 --------------------------------------------------------- */
-export default function App() {
+function App() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const orgPeople = useOrgPeople();
@@ -531,8 +561,8 @@ export default function App() {
 
   const dragData = (() => {
     if (typeof window === "undefined") return { current: null };
-    if (!window.__taskDrag) window.__taskDrag = { current: null };
-    return window.__taskDrag;
+    if (!(window as any).__taskDrag) (window as any).__taskDrag = { current: null };
+    return (window as any).__taskDrag;
   })();
   const [dragOverTarget, setDragOverTarget] = useState(null);
 
@@ -890,7 +920,8 @@ export default function App() {
   const getTask = (taskId) => findTaskEverywhere(taskId)?.task;
 
   /* ----------------- render task row ----------------- */
-  const TaskRow = ({ list, task, parentId, depth = 0 }) => {
+  const TaskRow = ({ list, task: taskProp, parentId, depth = 0 }) => {
+    const task = findTaskEverywhere(taskProp.id)?.task || taskProp;
     const isEditing = editingTaskId === task.id;
     const isDragOver = dragOverTarget?.kind === "task-target" && dragOverTarget.id === task.id;
     const tomorrowCount = tomorrowClickCount[task.id] || 0;
@@ -922,7 +953,7 @@ export default function App() {
                 onFocus={(e) => e.target.setSelectionRange(e.target.value.length, e.target.value.length)}
                 value={task.title}
                 onChange={(e) => setTitle(task.id, e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && e.target.blur()}
+                onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
                 placeholder="Title"
                 className={`flex-1 text-sm bg-transparent focus:outline-none border-b border-emerald-500 pb-0.5 ${task.completed ? "text-gray-400 line-through" : "text-gray-800"
                   }`}
@@ -949,11 +980,9 @@ export default function App() {
                           <MenuItem icon={CornerDownRight} onClick={() => indentTask(task.id, list.id)}>
                             Indent
                           </MenuItem>
-                          {/* Subtask inline expand */}
                           <MenuItem icon={CornerDownRight} onClick={() => {
                             setOpenTaskMenu(null);
                             setNewSubtaskInputs(p => ({ ...p, [task.id]: "" }));
-                            // Focus will happen via the input below
                           }}>
                             Add a subtask
                           </MenuItem>
@@ -966,7 +995,9 @@ export default function App() {
                               if (!file) return;
                               const url = URL.createObjectURL(file);
                               const attachment = { id: uid(), name: file.name, url, type: file.type };
-                              updateTaskEverywhere(task.id, (t) => ({ ...t, attachments: [...(t.attachments || []), attachment] }));
+                              const tid = task.id;
+                              updateTaskEverywhere(tid, (t) => ({ ...t, attachments: [...(t.attachments || []), attachment] }));
+                              setEditingTaskId(tid);
                               e.target.value = "";
                             }}
                           />
@@ -990,7 +1021,6 @@ export default function App() {
 
             {/* Details */}
             <div className="ml-9 mt-2 space-y-3">
-
 
               {/* Due date row */}
               <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1020,7 +1050,6 @@ export default function App() {
                       Tomorrow
                     </button>
                   )}
-
 
                   {/* Deadline date badge (only when specific date picked from calendar) */}
                   {task.dueDate ? (
@@ -1127,50 +1156,48 @@ export default function App() {
                   </>
                 )}
               </div>
-              {/* Attachment */}
-              <div>
-                <label className="flex items-center gap-2 cursor-pointer px-2.5 py-1.5 rounded-md border border-dashed border-gray-200 hover:border-emerald-400 transition-colors w-full">
-                  <Paperclip size={13} className="text-gray-400 flex-shrink-0" />
-                  <span className="text-xs text-gray-400">Add attachment</span>
-                  <input type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const url = URL.createObjectURL(file);
-                      const attachment = { id: uid(), name: file.name, url, type: file.type };
-                      updateTaskEverywhere(task.id, (t) => ({ ...t, attachments: [...(t.attachments || []), attachment] }));
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-                {(task.attachments || []).length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {(task.attachments || []).map(att => (
-                      <div key={att.id} className="relative group">
-                        {att.type?.startsWith("image/") ? (
-                          <a href={att.url} target="_blank" rel="noreferrer"
-                            className="flex items-center gap-1.5 px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition-colors">
-                            <Paperclip size={11} className="text-gray-400" />
-                            <span className="text-[10px] text-gray-600 max-w-[80px] truncate">{att.name}</span>
-                          </a>
-                        ) : (
-                          <a href={att.url} target="_blank" rel="noreferrer"
-                            className="flex items-center gap-1.5 px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition-colors">
-                            <Paperclip size={11} className="text-gray-400" />
-                            <span className="text-[10px] text-gray-600 max-w-[80px] truncate">{att.name}</span>
-                          </a>
-                        )}
-                        <button
-                          onClick={() => updateTaskEverywhere(task.id, (t) => ({ ...t, attachments: (t.attachments || []).filter(a => a.id !== att.id) }))}
-                          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full hidden group-hover:flex items-center justify-center"
-                        >
-                          <X size={9} />
-                        </button>
+
+              {/* Attachments badge below assign */}
+              {(task.attachments || []).length > 0 && (
+                <div className="relative" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setOpenAttFor(openAttFor === task.id ? null : task.id); }}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors text-[11px] font-medium"
+                  >
+                    <Paperclip size={11} />
+                    {task.attachments.length} attachment{task.attachments.length > 1 ? "s" : ""}
+                  </button>
+                  {openAttFor === task.id && (
+                    <>
+                      <Overlay onClose={() => setOpenAttFor(null)} />
+                      <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                        <div className="max-h-40 overflow-y-auto py-1">
+                          {task.attachments.map(att => (
+                            <div key={att.id} className="relative group/att">
+                              <a href={att.url} target="_blank" rel="noreferrer"
+                                className="flex items-center gap-2 px-3 py-2 pr-7 hover:bg-emerald-50 transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Paperclip size={11} className="text-gray-400 shrink-0" />
+                                <span className="text-xs text-gray-700 truncate">{att.name}</span>
+                              </a>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateTaskEverywhere(task.id, (t) => ({ ...t, attachments: (t.attachments || []).filter(a => a.id !== att.id) }));
+                                }}
+                                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 text-white rounded-full hidden group-hover/att:flex items-center justify-center"
+                              >
+                                <X size={9} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1610,5 +1637,13 @@ export default function App() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function TaskPage() {
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center bg-[#1E2228] text-white">Loading...</div>}>
+      <App />
+    </Suspense>
   );
 }
