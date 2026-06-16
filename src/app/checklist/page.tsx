@@ -32,7 +32,7 @@ export default function ChecklistRecords() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
-      <div className="bg-emerald-700 text-white px-4 py-3 flex items-center gap-3 sticky top-0 z-20 shadow-md">
+      <div className="bg-emerald-700 text-white px-6 py-4 flex items-center gap-3 sticky top-0 z-20 shadow-md">
         <div className="flex-1">
           <p className="font-semibold text-sm leading-tight">Saved Checklist Records</p>
           <p className="text-[11px] opacity-80 mt-0.5">{records.length} record{records.length !== 1 ? "s" : ""}</p>

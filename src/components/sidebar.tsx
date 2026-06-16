@@ -20,11 +20,10 @@ import {
 } from "lucide-react";
 
 const PRIMARY_NAV = [
-  { id: "dashboard", label: "Dashboard",  icon: LayoutDashboard, path: "/dashboard" },
-  { id: "starred",   label: "Starred",    icon: Star,            path: "/starred" },
+  { id: "task",      label: "Task",       icon: ClipboardList,   path: "/task" },
+  { id: "starred",   label: "Starred",    icon: Star,            path: "/" },
   { id: "checklist", label: "Checklist",  icon: ListChecks,      path: "/checklist" },
   { id: "staff",     label: "Staff",      icon: Users,           path: "/staff" },
-  { id: "task",      label: "Task",       icon: ClipboardList,   path: "/task" },
   { id: "settings", label: "Settings",   icon: Settings,        path: "/settings" },
 ];
 
