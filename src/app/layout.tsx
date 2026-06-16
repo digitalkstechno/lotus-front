@@ -4,6 +4,8 @@ import "./globals.css";
 import FCMProvider from "@/components/FCMProvider";
 import Sidebar from "../components/sidebar";
 import { ChecklistProvider } from "./checklist/context";
+import ReduxProvider from "@/redux/ReduxProvider";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,14 +30,17 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="flex h-screen overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto">
-           <FCMProvider>
-          <ChecklistProvider>
-            {children}
-          </ChecklistProvider>
-           </FCMProvider>
-        </main>
+        <ReduxProvider>
+          <Sidebar />
+          <main className="flex-1 overflow-y-auto">
+             <FCMProvider>
+            <ChecklistProvider>
+              {children}
+              <Toaster position="top-right" richColors />
+            </ChecklistProvider>
+             </FCMProvider>
+          </main>
+        </ReduxProvider>
       </body>
     </html>
   );

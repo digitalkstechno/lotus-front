@@ -1,6 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch, RootState } from "../../redux/store";
+import { fetchUnits, addUnit, updateUnit, deleteUnit } from "../../redux/slices/unitSlice";
+import { fetchTeams, addTeam, updateTeam, deleteTeam } from "../../redux/slices/teamSlice";
+import { fetchUsersPaginated, addUser, updateUser, deleteUser } from "../../redux/slices/userSlice";
+import axiosInstance from "../../utils/axios";
 import {
   Search,
   ChevronDown,
@@ -65,10 +71,10 @@ const INITIAL_TEAMS: Team[] = [
 ];
 
 const DESIGNATIONS = [
-  "Admin",
-  "Unit Head",
-  "Team Head",
-  "Staff",
+  { value: "admin", label: "Admin" },
+  { value: "unit_head", label: "Unit Head" },
+  { value: "team_head", label: "Team Head" },
+  { value: "staff", label: "Staff" },
 ];
 
 const INITIAL_STAFF: Staff[] = [
@@ -87,36 +93,32 @@ const INITIAL_STAFF: Staff[] = [
 ];
 
 export default function StaffPage() {
-  const [units, setUnits] = useState<Unit[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("org_units");
-      return saved ? JSON.parse(saved) : INITIAL_UNITS;
-    }
-    return INITIAL_UNITS;
-  });
-  const [teams, setTeams] = useState<Team[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("org_teams");
-      return saved ? JSON.parse(saved) : INITIAL_TEAMS;
-    }
-    return INITIAL_TEAMS;
-  });
-  const [staff, setStaff] = useState<Staff[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("org_staff");
-      return saved ? JSON.parse(saved) : INITIAL_STAFF;
-    }
-    return INITIAL_STAFF;
-  });
+  const dispatch = useDispatch<AppDispatch>();
+  const { units } = useSelector((state: RootState) => state.units);
+  const { teams } = useSelector((state: RootState) => state.teams);
+  const { users: staff, pagination } = useSelector((state: RootState) => state.users);
 
-  useEffect(() => { localStorage.setItem("org_units", JSON.stringify(units)); }, [units]);
-  useEffect(() => { localStorage.setItem("org_teams", JSON.stringify(teams)); }, [teams]);
-  useEffect(() => { localStorage.setItem("org_staff", JSON.stringify(staff)); }, [staff]);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    dispatch(fetchUnits());
+    dispatch(fetchTeams());
+  }, [dispatch]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [selectedUnitId, setSelectedUnitId] = useState<string | null>("u-1");
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null); // default entire org
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+
+  useEffect(() => {
+    dispatch(fetchUsersPaginated({
+      page: currentPage,
+      limit: 10,
+      search: searchQuery,
+      unitId: selectedUnitId,
+      teamId: selectedTeamId
+    }));
+  }, [dispatch, currentPage, searchQuery, selectedUnitId, selectedTeamId]);
   const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({ "u-1": true, "u-2": true, "u-3": true });
   const [toast, setToast] = useState<{ message: string; type: "success" | "info" | "warn" } | null>(null);
 
@@ -133,10 +135,16 @@ export default function StaffPage() {
   const closeDrawer = () => setDrawer({ type: null, title: "" });
 
   const [pickerSearch, setPickerSearch] = useState("");
+  const [pickerStaffList, setPickerStaffList] = useState<Staff[]>([]);
   const [isCreatingUserPicker, setIsCreatingUserPicker] = useState(false);
+  const pickerFilteredStaff = useMemo(() => {
+    if (!pickerSearch.trim()) return pickerStaffList;
+    const q = pickerSearch.toLowerCase();
+    return pickerStaffList.filter(s => s.name.toLowerCase().includes(q) || (s.designation || "").toLowerCase().includes(q));
+  }, [pickerStaffList, pickerSearch]);
   const [pickerForm, setPickerForm] = useState({ name: "", email: "", phone: "", designation: "" });
-  const [unitForm, setUnitForm] = useState({ name: "", headId: "" });
-  const [teamForm, setTeamForm] = useState({ name: "", unitId: "", headId: "" });
+  const [unitForm, setUnitForm] = useState({ name: "", headId: "", headName: "" });
+  const [teamForm, setTeamForm] = useState({ name: "", unitId: "", headId: "", headName: "" });
   const [staffForm, setStaffForm] = useState({ name: "", email: "", phone: "", designation: "", unitId: "", teamId: "" });
   const [confirmDialog, setConfirmDialog] = useState<{ title: string; message: string; onConfirm: () => void; } | null>(null);
 
@@ -144,103 +152,152 @@ export default function StaffPage() {
   const unitMap = useMemo(() => { const m = new Map<string, Unit>(); units.forEach(u => m.set(u.id, u)); return m; }, [units]);
   const teamMap = useMemo(() => { const m = new Map<string, Team>(); teams.forEach(t => m.set(t.id, t)); return m; }, [teams]);
 
-  const handleCreateUserInsidePicker = (e: React.FormEvent) => {
+  const handleCreateUserInsidePicker = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pickerForm.name.trim()) return;
-    const newStaffId = `s-${Date.now()}`;
-    const newStaffItem: Staff = { id: newStaffId, name: pickerForm.name, email: pickerForm.email || `${pickerForm.name.toLowerCase().replace(/\s+/g, ".")}@corp.acme.com`, phone: pickerForm.phone || "+1 (555) 000-0000", designation: pickerForm.designation || "Associate Specialist", unitId: null, teamId: null };
-    setStaff(prev => [...prev, newStaffItem]);
-    showToast(`Staff member "${pickerForm.name}" created and auto-selected!`);
-    setPickerForm({ name: "", email: "", phone: "", designation: "" });
-    setIsCreatingUserPicker(false);
-    if (drawer.payload?.onSelect) drawer.payload.onSelect(newStaffId);
+    const newStaffItem = { name: pickerForm.name, email: pickerForm.email || `${pickerForm.name.toLowerCase().replace(/\s+/g, ".")}@corp.acme.com`, phone: pickerForm.phone || "+1 (555) 000-0000", designation: pickerForm.designation || "Associate Specialist", unitId: null, teamId: null };
+    try {
+      const res = await dispatch(addUser(newStaffItem)).unwrap();
+      dispatch(fetchUsersPaginated({ page: currentPage, limit: 10, search: searchQuery, unitId: selectedUnitId, teamId: selectedTeamId }));
+      showToast(`Staff member "${pickerForm.name}" created and auto-selected!`);
+      setPickerForm({ name: "", email: "", phone: "", designation: "" });
+      setIsCreatingUserPicker(false);
+      if (drawer.payload?.onSelect && res?.id) drawer.payload.onSelect(res.id, res.name);
+    } catch (err) {
+      showToast("Failed to create user.", "warn");
+    }
   };
 
-  const handleSaveUnit = (e: React.FormEvent) => {
+  const handleSaveUnit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!unitForm.name.trim()) return;
-    if (drawer.type === "add-unit") {
-      const newId = `u-${Date.now()}`;
-      setUnits(prev => [...prev, { id: newId, name: unitForm.name, headId: unitForm.headId || null }]);
-      if (unitForm.headId) setStaff(prev => prev.map(s => s.id === unitForm.headId ? { ...s, unitId: newId } : s));
-      showToast(`Successfully created "${unitForm.name}" unit.`);
-    } else if (drawer.type === "edit-unit" && drawer.targetId) {
-      const oldUnit = units.find(u => u.id === drawer.targetId);
-      setUnits(prev => prev.map(u => u.id === drawer.targetId ? { ...u, name: unitForm.name, headId: unitForm.headId || null } : u));
-      if (unitForm.headId && unitForm.headId !== oldUnit?.headId) setStaff(prev => prev.map(s => s.id === unitForm.headId ? { ...s, unitId: drawer.targetId! } : s));
-      showToast(`Updated Unit details for "${unitForm.name}".`);
+    try {
+      if (drawer.type === "add-unit") {
+        await dispatch(addUnit({ name: unitForm.name, headId: unitForm.headId || null })).unwrap();
+        dispatch(fetchUnits());
+        showToast(`Successfully created "${unitForm.name}" unit.`);
+      } else if (drawer.type === "edit-unit" && drawer.targetId) {
+        await dispatch(updateUnit({ id: drawer.targetId, data: { name: unitForm.name, headId: unitForm.headId || null } })).unwrap();
+        dispatch(fetchUnits());
+        showToast(`Updated Unit details for "${unitForm.name}".`);
+      }
+      closeDrawer();
+    } catch (err) {
+      showToast("Operation failed.", "warn");
     }
-    closeDrawer();
   };
 
-  const handleSaveTeam = (e: React.FormEvent) => {
+  const handleSaveTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!teamForm.name.trim() || !teamForm.unitId) return;
-    if (drawer.type === "add-team") {
-      const newId = `t-${Date.now()}`;
-      setTeams(prev => [...prev, { id: newId, name: teamForm.name, unitId: teamForm.unitId, headId: teamForm.headId || null }]);
-      if (teamForm.headId) setStaff(prev => prev.map(s => s.id === teamForm.headId ? { ...s, unitId: teamForm.unitId, teamId: newId } : s));
-      showToast(`Team "${teamForm.name}" successfully established.`);
-    } else if (drawer.type === "edit-team" && drawer.targetId) {
-      const oldTeam = teams.find(t => t.id === drawer.targetId);
-      setTeams(prev => prev.map(t => t.id === drawer.targetId ? { ...t, name: teamForm.name, unitId: teamForm.unitId, headId: teamForm.headId || null } : t));
-      if (teamForm.headId && teamForm.headId !== oldTeam?.headId) setStaff(prev => prev.map(s => s.id === teamForm.headId ? { ...s, unitId: teamForm.unitId, teamId: drawer.targetId! } : s));
-      showToast(`Team "${teamForm.name}" information updated.`);
+    try {
+      if (drawer.type === "add-team") {
+        await dispatch(addTeam({ name: teamForm.name, unitId: teamForm.unitId, headId: teamForm.headId || null })).unwrap();
+        dispatch(fetchTeams());
+        showToast(`Team "${teamForm.name}" successfully established.`);
+      } else if (drawer.type === "edit-team" && drawer.targetId) {
+        await dispatch(updateTeam({ id: drawer.targetId, data: { name: teamForm.name, unitId: teamForm.unitId, headId: teamForm.headId || null } })).unwrap();
+        dispatch(fetchTeams());
+        showToast(`Team "${teamForm.name}" information updated.`);
+      }
+      closeDrawer();
+    } catch (err) {
+      showToast("Operation failed.", "warn");
     }
-    closeDrawer();
   };
 
-  const handleSaveStaff = (e: React.FormEvent) => {
+  const handleSaveStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!staffForm.name.trim()) return;
-    if (drawer.type === "add-staff") {
-      const newId = `s-${Date.now()}`;
-      setStaff(prev => [...prev, { id: newId, name: staffForm.name, email: staffForm.email || `${staffForm.name.toLowerCase().replace(/\s+/g, ".")}@corp.acme.com`, phone: staffForm.phone || "+1 (555) 000-0000", designation: staffForm.designation || "Staff Specialist", unitId: staffForm.unitId || null, teamId: staffForm.teamId || null }]);
-      showToast(`Staff profile for "${staffForm.name}" added successfully.`);
-    } else if (drawer.type === "edit-staff" && drawer.targetId) {
-      setStaff(prev => prev.map(s => s.id === drawer.targetId ? { ...s, name: staffForm.name, email: staffForm.email, phone: staffForm.phone, designation: staffForm.designation, unitId: staffForm.unitId || null, teamId: staffForm.teamId || null } : s));
-      showToast(`Staff information saved.`);
+    try {
+      if (drawer.type === "add-staff") {
+        await dispatch(addUser({ name: staffForm.name, email: staffForm.email || `${staffForm.name.toLowerCase().replace(/\s+/g, ".")}@corp.acme.com`, phone: staffForm.phone || "+1 (555) 000-0000", designation: staffForm.designation || "Staff Specialist", unitId: staffForm.unitId || null, teamId: staffForm.teamId || null })).unwrap();
+        if (staffForm.designation === "unit_head") dispatch(fetchUnits());
+        if (staffForm.designation === "team_head") dispatch(fetchTeams());
+        dispatch(fetchUsersPaginated({ page: currentPage, limit: 10, search: searchQuery, unitId: selectedUnitId, teamId: selectedTeamId }));
+        showToast(`Staff profile for "${staffForm.name}" added successfully.`);
+      } else if (drawer.type === "edit-staff" && drawer.targetId) {
+        await dispatch(updateUser({ id: drawer.targetId, data: { name: staffForm.name, email: staffForm.email, phone: staffForm.phone, designation: staffForm.designation, unitId: staffForm.unitId || null, teamId: staffForm.teamId || null } })).unwrap();
+        if (staffForm.designation === "unit_head") dispatch(fetchUnits());
+        if (staffForm.designation === "team_head") dispatch(fetchTeams());
+        dispatch(fetchUsersPaginated({ page: currentPage, limit: 10, search: searchQuery, unitId: selectedUnitId, teamId: selectedTeamId }));
+        showToast(`Staff information saved.`);
+      }
+      closeDrawer();
+    } catch (err) {
+      showToast("Operation failed.", "warn");
     }
-    closeDrawer();
   };
 
-  const staffFormTeams = useMemo(() => { if (!staffForm.unitId) return []; return teams.filter(t => t.unitId === staffForm.unitId); }, [teams, staffForm.unitId]);
+  const staffFormTeams = useMemo(() => { if (!staffForm.unitId) return []; return teams.filter((t: any) => t.unitId === staffForm.unitId); }, [teams, staffForm.unitId]);
 
   const handleDeleteUnit = (id: string, name: string) => {
-    setConfirmDialog({ title: "Delete Organizational Unit?", message: `Are you absolute certain you wish to delete "${name}"? All nested teams and personnel will be orphaned.`, onConfirm: () => { setUnits(prev => prev.filter(u => u.id !== id)); setStaff(prev => prev.map(s => s.unitId === id ? { ...s, unitId: null, teamId: null } : s)); setTeams(prev => prev.filter(t => t.unitId !== id)); if (selectedUnitId === id) { setSelectedUnitId(null); setSelectedTeamId(null); } showToast(`Unit "${name}" deleted.`); setConfirmDialog(null); } });
+    setConfirmDialog({ title: "Delete Organizational Unit?", message: `Are you absolute certain you wish to delete "${name}"? All nested teams and personnel will be orphaned.`, onConfirm: async () => { 
+      try {
+        await dispatch(deleteUnit(id)).unwrap();
+        if (selectedUnitId === id) { setSelectedUnitId(null); setSelectedTeamId(null); } 
+        showToast(`Unit "${name}" deleted.`); 
+        setConfirmDialog(null); 
+      } catch(err) { showToast("Delete failed", "warn"); }
+    } });
   };
 
   const handleDeleteTeam = (id: string, name: string) => {
-    setConfirmDialog({ title: "Disband Team?", message: `Ensure you want to remove the team "${name}"?`, onConfirm: () => { setTeams(prev => prev.filter(t => t.id !== id)); setStaff(prev => prev.map(s => s.teamId === id ? { ...s, teamId: null } : s)); if (selectedTeamId === id) setSelectedTeamId(null); showToast(`Team "${name}" disbanded.`); setConfirmDialog(null); } });
+    setConfirmDialog({ title: "Disband Team?", message: `Ensure you want to remove the team "${name}"?`, onConfirm: async () => { 
+      try {
+        await dispatch(deleteTeam(id)).unwrap();
+        if (selectedTeamId === id) setSelectedTeamId(null); 
+        showToast(`Team "${name}" disbanded.`); 
+        setConfirmDialog(null); 
+      } catch(err) { showToast("Delete failed", "warn"); }
+    } });
   };
 
   const handleDeleteStaff = (id: string, name: string) => {
-    setConfirmDialog({ title: "Remove Staff Profile?", message: `This will fully clear "${name}" from your active directory database. This cannot be undone.`, onConfirm: () => { setStaff(prev => prev.filter(s => s.id !== id)); setUnits(prev => prev.map(u => u.headId === id ? { ...u, headId: null } : u)); setTeams(prev => prev.map(t => t.headId === id ? { ...t, headId: null } : t)); showToast(`Staff record for "${name}" deleted successfully.`); setConfirmDialog(null); } });
+    setConfirmDialog({ title: "Remove Staff Profile?", message: `This will fully clear "${name}" from your active directory database. This cannot be undone.`, onConfirm: async () => { 
+      try {
+        await dispatch(deleteUser(id)).unwrap();
+        showToast(`Staff record for "${name}" deleted successfully.`); 
+        setConfirmDialog(null); 
+      } catch(err) { showToast("Delete failed", "warn"); }
+    } });
   };
 
-  const handleExecuteUnitPromotion = (staffId: string, unitId: string) => {
+  const handleExecuteUnitPromotion = async (staffId: string, unitId: string) => {
     const candidate = staffMap.get(staffId); const targetUnit = unitMap.get(unitId);
     if (!candidate || !targetUnit) return;
     const oldHeadId = targetUnit.headId; const oldHeadName = oldHeadId ? staffMap.get(oldHeadId)?.name : null;
-    const executePromote = () => { setUnits(prev => prev.map(u => u.id === unitId ? { ...u, headId: staffId } : u)); setStaff(prev => prev.map(s => s.id === staffId ? { ...s, unitId: unitId, teamId: s.unitId === unitId ? s.teamId : null } : s)); showToast(`Smart Promotion Successful! Head of "${targetUnit.name}" is now ${candidate.name}.`); setConfirmDialog(null); closeDrawer(); };
+    const executePromote = async () => { 
+      try {
+        await dispatch(updateUnit({ id: unitId, data: { ...targetUnit, headId: staffId }})).unwrap();
+        showToast(`Smart Promotion Successful! Head of "${targetUnit.name}" is now ${candidate.name}.`); 
+        setConfirmDialog(null); closeDrawer(); 
+      } catch(err) {}
+    };
     if (oldHeadId && oldHeadId !== staffId) { setConfirmDialog({ title: "Confirm Smart Replacement", message: `Currently, ${oldHeadName} is the head of ${targetUnit.name}. Smart Promotion will replace existing head with ${candidate.name}. Proceed?`, onConfirm: executePromote }); } else { executePromote(); }
   };
 
-  const handleExecuteTeamPromotion = (staffId: string, teamId: string) => {
+  const handleExecuteTeamPromotion = async (staffId: string, teamId: string) => {
     const candidate = staffMap.get(staffId); const targetTeam = teamMap.get(teamId);
     if (!candidate || !targetTeam) return;
     const oldHeadId = targetTeam.headId; const oldHeadName = oldHeadId ? staffMap.get(oldHeadId)?.name : null;
-    const executePromote = () => { setTeams(prev => prev.map(t => t.id === teamId ? { ...t, headId: staffId } : t)); setStaff(prev => prev.map(s => s.id === staffId ? { ...s, unitId: targetTeam.unitId, teamId: teamId } : s)); showToast(`Smart Promotion Successful! Team Lead of "${targetTeam.name}" is now ${candidate.name}.`); setConfirmDialog(null); closeDrawer(); };
+    const executePromote = async () => { 
+      try {
+        await dispatch(updateTeam({ id: teamId, data: { ...targetTeam, headId: staffId }})).unwrap();
+        showToast(`Smart Promotion Successful! Team Lead of "${targetTeam.name}" is now ${candidate.name}.`); 
+        setConfirmDialog(null); closeDrawer(); 
+      } catch(err) {}
+    };
     if (oldHeadId && oldHeadId !== staffId) { setConfirmDialog({ title: "Confirm Lead Replacement", message: `Currently, ${oldHeadName} is the Lead of ${targetTeam.name}. Smart Promotion will replace existing lead with ${candidate.name}. Proceed?`, onConfirm: executePromote }); } else { executePromote(); }
   };
 
-  const handleExecuteTransfer = (staffId: string, destUnitId: string | null, destTeamId: string | null) => {
+  const handleExecuteTransfer = async (staffId: string, destUnitId: string | null, destTeamId: string | null) => {
     const candidate = staffMap.get(staffId); if (!candidate) return;
-    setStaff(prev => prev.map(s => s.id === staffId ? { ...s, unitId: destUnitId, teamId: destTeamId } : s));
-    if (destUnitId && candidate.unitId !== destUnitId) setUnits(prev => prev.map(u => u.id === candidate.unitId && u.headId === staffId ? { ...u, headId: null } : u));
-    if (destTeamId && candidate.teamId !== destTeamId) setTeams(prev => prev.map(t => t.id === candidate.teamId && t.headId === staffId ? { ...t, headId: null } : t));
-    showToast(`Transferred "${candidate.name}" to ${destUnitId ? unitMap.get(destUnitId)?.name : "Unassigned"}.`);
-    closeDrawer();
+    try {
+      await dispatch(updateUser({ id: staffId, data: { ...candidate, unitId: destUnitId, teamId: destTeamId }})).unwrap();
+      showToast(`Transferred "${candidate.name}" to ${destUnitId ? unitMap.get(destUnitId)?.name : "Unassigned"}.`);
+      closeDrawer();
+    } catch(err) {}
   };
 
   const handleExportData = () => {
@@ -251,54 +308,63 @@ export default function StaffPage() {
 
   const handleImportJsonFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
-    const fr = new FileReader(); fr.onload = (ev) => { try { const d = JSON.parse(ev.target?.result as string); if (Array.isArray(d.units) && Array.isArray(d.teams) && Array.isArray(d.staff)) { setUnits(d.units); setTeams(d.teams); setStaff(d.staff); showToast("Successfully imported!", "success"); } else { showToast("Invalid JSON structure.", "warn"); } } catch { showToast("Error reading file.", "warn"); } }; fr.readAsText(file); e.target.value = "";
+    const fr = new FileReader(); fr.onload = (ev) => { try { const d = JSON.parse(ev.target?.result as string); if (Array.isArray(d.units) && Array.isArray(d.teams) && Array.isArray(d.staff)) {  showToast("Successfully imported!", "success"); } else { showToast("Invalid JSON structure.", "warn"); } } catch { showToast("Error reading file.", "warn"); } }; fr.readAsText(file); e.target.value = "";
   };
 
   const handleResetToSeeds = () => {
-    setConfirmDialog({ title: "Reset to Default Seed Data?", message: "Are you sure you want to restore the original Demo Org structure?", onConfirm: () => { setUnits(INITIAL_UNITS); setTeams(INITIAL_TEAMS); setStaff(INITIAL_STAFF); setExpandedUnits({ "u-1": true, "u-2": true, "u-3": true }); setSelectedUnitId("u-1"); setSelectedTeamId(null); showToast("Restored original directory seed templates.", "info"); setConfirmDialog(null); } });
+    setConfirmDialog({ title: "Reset to Default Seed Data?", message: "Are you sure you want to restore the original Demo Org structure?", onConfirm: () => {  showToast("Restored original directory seed templates.", "info"); setConfirmDialog(null); } });
   };
 
-  const triggerAddUnit = () => { setUnitForm({ name: "", headId: "" }); setDrawer({ type: "add-unit", title: "Establish New Unit" }); };
-  const triggerEditUnit = (unit: Unit) => { setUnitForm({ name: unit.name, headId: unit.headId || "" }); setDrawer({ type: "edit-unit", title: `Modify ${unit.name} Unit`, targetId: unit.id }); };
-  const triggerAddTeam = (prefillUnitId?: string) => { setTeamForm({ name: "", unitId: prefillUnitId || units[0]?.id || "", headId: "" }); setDrawer({ type: "add-team", title: "Establish New Squad Team" }); };
-  const triggerEditTeam = (team: Team) => { setTeamForm({ name: team.name, unitId: team.unitId, headId: team.headId || "" }); setDrawer({ type: "edit-team", title: `Modify ${team.name} Squad`, targetId: team.id }); };
-  const triggerAddStaff = (prefillUnitId?: string | null, prefillTeamId?: string | null) => { setStaffForm({ name: "", email: "", phone: "", designation: "", unitId: prefillUnitId || "", teamId: prefillTeamId || "" }); setDrawer({ type: "add-staff", title: "Add New Staff Member" }); };
+  const triggerAddUnit = () => { setUnitForm({ name: "", headId: "", headName: "" }); setDrawer({ type: "add-unit", title: "Establish New Unit" }); };
+  const triggerEditUnit = (unit: Unit) => { setUnitForm({ name: unit.name, headId: unit.headId || "", headName: (unit as any).headName || "" }); setDrawer({ type: "edit-unit", title: `Modify ${unit.name} Unit`, targetId: unit.id }); };
+  const triggerAddTeam = (prefillUnitId?: string) => { setTeamForm({ name: "", unitId: prefillUnitId || units[0]?.id || "", headId: "", headName: "" }); setDrawer({ type: "add-team", title: "Establish New Squad Team" }); };
+  const triggerEditTeam = (team: Team) => { setTeamForm({ name: team.name, unitId: team.unitId, headId: team.headId || "", headName: (team as any).headName || "" }); setDrawer({ type: "edit-team", title: `Modify ${team.name} Squad`, targetId: team.id }); };
+  const triggerAddStaff = (prefillUnitId?: string | null, prefillTeamId?: string | null, prefillRole?: string | null) => { setStaffForm({ name: "", email: "", phone: "", designation: prefillRole || "staff", unitId: prefillUnitId || "", teamId: prefillTeamId || "" }); setDrawer({ type: "add-staff", title: "Add New Staff Member" }); };
   const triggerEditStaff = (personnel: Staff) => { setStaffForm({ name: personnel.name, email: personnel.email, phone: personnel.phone, designation: personnel.designation, unitId: personnel.unitId || "", teamId: personnel.teamId || "" }); setDrawer({ type: "edit-staff", title: `Edit ${personnel.name}'s Profile`, targetId: personnel.id }); };
   const triggerTransferStaff = (personnel: Staff) => { setDrawer({ type: "transfer-staff", title: `Transfer ${personnel.name}`, targetId: personnel.id, payload: { unitId: personnel.unitId || "", teamId: personnel.teamId || "" } }); };
   const triggerPromoteToTeam = (personnel: Staff) => { setDrawer({ type: "promote-team", title: `Promote ${personnel.name} to Team Lead`, targetId: personnel.id, payload: { selectedTeamId: personnel.teamId || teams[0]?.id || "" } }); };
-  const triggerUserPicker = (currentSelectionId: string | null, onSelect: (staffId: string) => void) => { setPickerSearch(""); setIsCreatingUserPicker(false); setPickerForm({ name: "", email: "", phone: "", designation: "" }); setDrawer({ type: "user-picker", title: "Select Active Directory Staff", payload: { currentSelectionId, onSelect } }); };
-
-  const pickerFilteredStaff = useMemo(() => { const term = pickerSearch.toLowerCase().trim(); if (!term) return staff; return staff.filter(s => s.name.toLowerCase().includes(term) || s.designation.toLowerCase().includes(term) || s.email.toLowerCase().includes(term)); }, [staff, pickerSearch]);
-
-  const selectedUnit = selectedUnitId && selectedUnitId !== "unassigned" ? unitMap.get(selectedUnitId) || null : null;
-  const selectedTeam = selectedTeamId ? teamMap.get(selectedTeamId) || null : null;
-  const unassignedStaff = useMemo(() => staff.filter(s => !s.unitId && !s.teamId), [staff]);
-
-  const getRoleLabel = (person: Staff): string => {
-    if (units.some(u => u.headId === person.id)) return "Department Head";
-    if (teams.some(t => t.headId === person.id)) return "Team Leader";
-    if (!person.unitId && !person.teamId) return "Unassigned";
-    return "Team Member";
-  };
-
-  const roleBadgeClasses = (role: string) => {
-    switch (role) {
-      case "Department Head": return "bg-emerald-50 text-emerald-600 border border-indigo-100";
-      case "Team Leader": return "bg-amber-50 text-amber-700 border border-amber-100";
-      case "Unassigned": return "bg-slate-100 text-slate-500 border border-slate-200";
-      default: return "bg-slate-100 text-slate-600 border border-slate-200";
+  const triggerUserPicker = async (currentSelectionId: string | null, roleFilter: string | null, onSelect: (staffId: string, staffName?: string) => void, contextUnitId?: string | null, contextTeamId?: string | null) => { 
+    setPickerSearch(""); 
+    setIsCreatingUserPicker(false); 
+    setPickerForm({ name: "", email: "", phone: "", designation: roleFilter || "" }); 
+    setDrawer({ type: "user-picker", title: "Select Active Directory Staff", payload: { currentSelectionId, onSelect, roleFilter, unitId: contextUnitId, teamId: contextTeamId } }); 
+    try {
+      const res = await axiosInstance.get(`/user/dropdown${roleFilter ? `?role=${roleFilter}` : ""}`);
+      if (res.data && res.data.data) {
+        setPickerStaffList(res.data.data.map((u: any) => ({
+          id: u._id, name: u.fullName, email: u.email, phone: u.contactNo ? String(u.contactNo) : "+1 (555) 000-0000", designation: u.role, unitId: u.unit_id || null, teamId: u.team_id || null
+        })));
+      }
+    } catch (e) {
+      setPickerStaffList([]);
     }
   };
 
-  const displayedStaff = useMemo(() => {
-    let result = staff;
-    if (selectedTeamId) result = result.filter(s => s.teamId === selectedTeamId);
-    else if (selectedUnitId === "unassigned") result = result.filter(s => !s.unitId && !s.teamId);
-    else if (selectedUnitId) result = result.filter(s => s.unitId === selectedUnitId);
-    const term = searchQuery.toLowerCase().trim();
-    if (term) result = result.filter(s => s.name.toLowerCase().includes(term) || s.email.toLowerCase().includes(term) || s.designation.toLowerCase().includes(term));
-    return result;
-  }, [staff, selectedUnitId, selectedTeamId, searchQuery]);
+  const displayedStaff = staff;
+  const unassignedStaff = useMemo(() => staff.filter(s => !s.unitId && !s.teamId), [staff]);
+
+  const selectedUnit = selectedUnitId && selectedUnitId !== "unassigned" ? unitMap.get(selectedUnitId) || null : null;
+  const selectedTeam = selectedTeamId ? teamMap.get(selectedTeamId) || null : null;
+
+  const getRoleLabel = (person: Staff): string => {
+    const rawRole = person.designation || "staff";
+    switch (rawRole) {
+      case "admin": return "Admin";
+      case "unit_head": return "Unit Head";
+      case "team_head": return "Team Head";
+      case "staff": return "Staff";
+      default:
+        return rawRole.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    }
+  };
+
+  const roleBadgeClasses = (role: string) => {
+    const r = role.toLowerCase();
+    if (r === "admin") return "bg-emerald-50 text-emerald-600 border border-emerald-100";
+    if (r === "unit head" || r === "unit_head") return "bg-indigo-50 text-indigo-600 border border-indigo-100";
+    if (r === "team head" || r === "team_head") return "bg-amber-50 text-amber-700 border border-amber-100";
+    return "bg-slate-100 text-slate-600 border border-slate-200";
+  };
 
   let pageTitle = "Entire Organization";
   if (selectedTeam) pageTitle = `Team: ${selectedTeam.name}`;
@@ -339,7 +405,7 @@ export default function StaffPage() {
         {/* Units */}
         {units.map((unit) => {
           const unitTeams = teams.filter(t => t.unitId === unit.id);
-          const head = unit.headId ? staffMap.get(unit.headId) : null;
+          const headName = unit.headId ? (staffMap.get(unit.headId)?.name || (unit as any).headName) : null;
           const isExpanded = !!expandedUnits[unit.id];
           const isUnitActive = selectedUnitId === unit.id && !selectedTeamId;
 
@@ -356,13 +422,13 @@ export default function StaffPage() {
                   <Building2 className="w-3.5 h-3.5 shrink-0 text-slate-500" />
                   <span className="font-semibold text-[13px] truncate">{unit.name}</span>
                 </div>
-                {head && <span className="text-[10px] text-slate-400 font-medium shrink-0 truncate max-w-[80px]">Head: {head.name.split(" ")[0]}</span>}
+                {headName && <span className="text-[10px] text-slate-400 font-medium shrink-0 truncate max-w-[80px]">Head: {headName.split(" ")[0]}</span>}
               </div>
 
               {isExpanded && (
                 <div className="ml-8 mr-2 space-y-0.5 mb-1">
                   {unitTeams.map((team) => {
-                    const lead = team.headId ? staffMap.get(team.headId) : null;
+                    const leadName = team.headId ? (staffMap.get(team.headId)?.name || (team as any).headName) : null;
                     const isTeamActive = selectedTeamId === team.id;
                     return (
                       <div
@@ -374,7 +440,7 @@ export default function StaffPage() {
                           <Users className="w-3 h-3 shrink-0 text-slate-400" />
                           <span className="font-medium truncate">{team.name}</span>
                         </div>
-                        {lead && <span className="text-[10px] text-slate-400 font-medium shrink-0">Lead: {lead.name.split(" ")[0]}</span>}
+                        {leadName && <span className="text-[10px] text-slate-400 font-medium shrink-0">Lead: {leadName.split(" ")[0]}</span>}
                       </div>
                     );
                   })}
@@ -473,14 +539,18 @@ export default function StaffPage() {
               <div>
                 <h1 className="text-[18px] font-bold text-slate-800 leading-tight">{pageTitle}</h1>
                 <p className="text-slate-400 text-[13px] mt-0.5">
-                  {displayedStaff.length} member{displayedStaff.length === 1 ? "" : "s"} found
-                  {selectedUnit && <> · Head: <span className="font-semibold text-slate-600">{selectedUnit.headId ? staffMap.get(selectedUnit.headId)?.name : "None"}</span></>}
-                  {selectedTeam && <> · Lead: <span className="font-semibold text-slate-600">{selectedTeam.headId ? staffMap.get(selectedTeam.headId)?.name : "None"}</span></>}
+                  {pagination?.total || 0} member{(pagination?.total || 0) === 1 ? "" : "s"} found
+                  {selectedUnit && <> · Head: <span className="font-semibold text-slate-600">{selectedUnit.headId ? (staffMap.get(selectedUnit.headId)?.name || (selectedUnit as any).headName || "Unknown") : "None"}</span></>}
+                  {selectedTeam && <> · Lead: <span className="font-semibold text-slate-600">{selectedTeam.headId ? (staffMap.get(selectedTeam.headId)?.name || (selectedTeam as any).headName || "Unknown") : "None"}</span></>}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              <div className="relative mr-2">
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                <input type="text" placeholder="Search staff..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }} className="w-56 bg-white text-slate-800 placeholder-slate-400 border border-slate-200 rounded-lg py-2 pl-9 pr-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-[12px] shadow-sm" />
+              </div>
               {selectedUnit && !selectedTeam && (
                 <>
                   <button onClick={() => triggerEditUnit(selectedUnit)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-emerald-50 border border-slate-200 font-semibold text-slate-700 cursor-pointer transition-colors text-[12px]">
@@ -524,10 +594,10 @@ export default function StaffPage() {
                 </tr>
               </thead>
               <tbody>
-                {displayedStaff.length === 0 ? (
+                {staff.length === 0 ? (
                   <tr><td colSpan={6} className="py-16 text-center text-slate-300 italic text-[13px]">No staff members found for this view.</td></tr>
                 ) : (
-                  displayedStaff.map((person) => {
+                  staff.map((person: any) => {
                     const role = getRoleLabel(person);
                     const unit = person.unitId ? unitMap.get(person.unitId) : null;
                     const team = person.teamId ? teamMap.get(person.teamId) : null;
@@ -566,6 +636,19 @@ export default function StaffPage() {
                 )}
               </tbody>
             </table>
+            
+            {/* Pagination Controls */}
+            {pagination && pagination.total > 0 && (
+              <div className="flex items-center justify-between border-t border-slate-100 py-4 mt-2">
+                <div className="text-[12px] text-slate-500">
+                  Showing <span className="font-semibold text-slate-700">{((currentPage - 1) * 10) + 1}</span> to <span className="font-semibold text-slate-700">{Math.min(currentPage * 10, pagination.total)}</span> of <span className="font-semibold text-slate-700">{pagination.total}</span> results
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1.5 border border-slate-200 rounded-md text-[12px] font-medium text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                  <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage * 10 >= pagination.total} className="px-3 py-1.5 border border-slate-200 rounded-md text-[12px] font-medium text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+                </div>
+              </div>
+            )}
           </div>
         </main>
 
@@ -599,10 +682,10 @@ export default function StaffPage() {
                             <label className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">Unit Head</label>
                             <div className="flex items-center gap-2">
                               <div className="flex-1 bg-gray-100 rounded-lg px-3 py-2.5 text-sm text-slate-700 flex items-center justify-between min-w-0">
-                                <span className="truncate">{unitForm.headId ? staffMap.get(unitForm.headId)?.name : <span className="text-slate-400">Not assigned</span>}</span>
-                                {unitForm.headId && <button type="button" onClick={() => setUnitForm(p => ({ ...p, headId: "" }))} className="text-slate-400 hover:text-slate-600 ml-2 shrink-0"><X className="w-3.5 h-3.5" /></button>}
+                                <span className="truncate">{unitForm.headId ? (staffMap.get(unitForm.headId)?.name || unitForm.headName || <span className="text-slate-400">Unknown Name</span>) : <span className="text-slate-400">Not assigned</span>}</span>
+                                {unitForm.headId && <button type="button" onClick={() => setUnitForm(p => ({ ...p, headId: "", headName: "" }))} className="text-slate-400 hover:text-slate-600 ml-2 shrink-0"><X className="w-3.5 h-3.5" /></button>}
                               </div>
-                              <button type="button" onClick={() => triggerUserPicker(unitForm.headId, (sId) => { setUnitForm(p => ({ ...p, headId: sId })); closeDrawer(); setDrawer(prev => ({ ...prev, type: drawer.type })); })} className="px-3 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg shrink-0 cursor-pointer transition-colors">Choose</button>
+                              <button type="button" onClick={() => triggerUserPicker(unitForm.headId, "unit_head", (sId, sName) => { setUnitForm(p => ({ ...p, headId: sId, headName: sName || "" })); closeDrawer(); setDrawer(prev => ({ ...prev, type: drawer.type })); }, drawer.targetId, null)} className="px-3 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg shrink-0 cursor-pointer transition-colors">Choose</button>
                             </div>
                           </div>
                         </div>
@@ -633,10 +716,10 @@ export default function StaffPage() {
                             <label className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">Team Lead</label>
                             <div className="flex items-center gap-2">
                               <div className="flex-1 bg-gray-100 rounded-lg px-3 py-2.5 text-sm text-slate-700 flex items-center justify-between min-w-0">
-                                <span className="truncate">{teamForm.headId ? staffMap.get(teamForm.headId)?.name : <span className="text-slate-400">Not assigned</span>}</span>
-                                {teamForm.headId && <button type="button" onClick={() => setTeamForm(p => ({ ...p, headId: "" }))} className="text-slate-400 hover:text-slate-600 ml-2 shrink-0"><X className="w-3.5 h-3.5" /></button>}
+                                <span className="truncate">{teamForm.headId ? (staffMap.get(teamForm.headId)?.name || teamForm.headName || <span className="text-slate-400">Unknown Name</span>) : <span className="text-slate-400">Not assigned</span>}</span>
+                                {teamForm.headId && <button type="button" onClick={() => setTeamForm(p => ({ ...p, headId: "", headName: "" }))} className="text-slate-400 hover:text-slate-600 ml-2 shrink-0"><X className="w-3.5 h-3.5" /></button>}
                               </div>
-                              <button type="button" onClick={() => triggerUserPicker(teamForm.headId, (sId) => { setTeamForm(p => ({ ...p, headId: sId })); closeDrawer(); setDrawer(prev => ({ ...prev, type: drawer.type })); })} className="px-3 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg shrink-0 cursor-pointer transition-colors">Choose</button>
+                              <button type="button" onClick={() => triggerUserPicker(teamForm.headId, "team_head", (sId, sName) => { setTeamForm(p => ({ ...p, headId: sId, headName: sName || "" })); closeDrawer(); setDrawer(prev => ({ ...prev, type: drawer.type })); }, teamForm.unitId, drawer.targetId)} className="px-3 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg shrink-0 cursor-pointer transition-colors">Choose</button>
                             </div>
                           </div>
                         </div>
@@ -664,7 +747,7 @@ export default function StaffPage() {
                             <label className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">Designation *</label>
                             <select required value={staffForm.designation} onChange={(e) => setStaffForm(p => ({ ...p, designation: e.target.value }))} className="w-full bg-gray-100 text-slate-800 border-0 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
                               <option value="">Select Designation</option>
-                              {DESIGNATIONS.map(d => <option key={d} value={d}>{d}</option>)}
+                              {DESIGNATIONS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
                             </select>
                           </div>
                           <div className="space-y-1">
@@ -673,7 +756,7 @@ export default function StaffPage() {
                           </div>
                           <div className="space-y-1">
                             <label className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">Phone</label>
-                            <input type="text" placeholder="+1 (555) 000-0000" value={staffForm.phone} onChange={(e) => setStaffForm(p => ({ ...p, phone: e.target.value }))} className="w-full bg-gray-100 text-slate-800 placeholder-slate-400 border-0 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                            <input type="text" placeholder="1234567890" maxLength={10} value={staffForm.phone || ""} onChange={(e) => setStaffForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))} className="w-full bg-gray-100 text-slate-800 placeholder-slate-400 border-0 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
                           </div>
                         </div>
                       </div>
@@ -708,7 +791,7 @@ export default function StaffPage() {
                         <>
                           <div className="flex items-center justify-between">
                             <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Select Staff</span>
-                            <button onClick={() => setIsCreatingUserPicker(true)} className="flex items-center gap-1 text-[12px] text-emerald-600 hover:text-emerald-700 font-semibold cursor-pointer">
+                            <button onClick={() => triggerAddStaff(drawer.payload?.unitId, drawer.payload?.teamId, drawer.payload?.roleFilter)} className="flex items-center gap-1 text-[12px] text-emerald-600 hover:text-emerald-700 font-semibold cursor-pointer">
                               <Plus className="w-3.5 h-3.5" /> Create New
                             </button>
                           </div>
@@ -720,7 +803,7 @@ export default function StaffPage() {
                             {pickerFilteredStaff.map((person) => {
                               const isChecked = drawer.payload?.currentSelectionId === person.id;
                               return (
-                                <div key={person.id} onClick={() => { if (drawer.payload?.onSelect) drawer.payload.onSelect(person.id); }}
+                                <div key={person.id} onClick={() => { if (drawer.payload?.onSelect) drawer.payload.onSelect(person.id, person.name); }}
                                   className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${isChecked ? "bg-emerald-50 border border-emerald-500" : "bg-white border border-transparent hover:bg-slate-50 hover:border-slate-200"}`}>
                                   <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold uppercase shrink-0 ${isChecked ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-600"}`}>
                                     {person.name.charAt(0)}
@@ -743,7 +826,13 @@ export default function StaffPage() {
                           </div>
                           <div className="bg-white rounded-xl p-4 space-y-3 shadow-sm">
                             <div className="space-y-1"><label className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">Full Name *</label><input type="text" required placeholder="e.g. Manav Shah" value={pickerForm.name} onChange={(e) => setPickerForm(p => ({ ...p, name: e.target.value }))} className="w-full bg-gray-100 text-slate-800 placeholder-slate-400 border-0 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" /></div>
-                            <div className="space-y-1"><label className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">Designation</label><input type="text" placeholder="e.g. Associate" value={pickerForm.designation} onChange={(e) => setPickerForm(p => ({ ...p, designation: e.target.value }))} className="w-full bg-gray-100 text-slate-800 placeholder-slate-400 border-0 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" /></div>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">Role *</label>
+                              <select required value={pickerForm.designation} onChange={(e) => setPickerForm(p => ({ ...p, designation: e.target.value }))} className="w-full bg-gray-100 text-slate-800 border-0 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                                <option value="">Select Role</option>
+                                {DESIGNATIONS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                              </select>
+                            </div>
                             <button type="submit" className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-semibold cursor-pointer transition-colors text-sm">Create & Select</button>
                           </div>
                         </form>

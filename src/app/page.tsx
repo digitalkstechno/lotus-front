@@ -26,7 +26,7 @@ import {
   Menu,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import Sidebar from "./components/sidebar";
+import Sidebar from "../components/sidebar";
 
 // Interfaces
 interface Staff {

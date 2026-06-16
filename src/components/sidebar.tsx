@@ -38,6 +38,8 @@ export default function Sidebar() {
     : pathname === path;
   const handleCreateNewList = () => router.push("/task?newList=1");
 
+  if (pathname === "/login") return null;
+
   return (
     <aside className="w-56 h-screen flex flex-col select-none shrink-0 bg-white border-r border-gray-100">
 

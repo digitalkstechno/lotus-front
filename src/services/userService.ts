@@ -1,0 +1,19 @@
+import axiosInstance from "../utils/axios";
+
+export const getUsersPaginatedApi = (page: number, limit: number, search: string, unitId?: string | null, teamId?: string | null) => {
+  return axiosInstance.get(`/user`, {
+    params: { page, limit, search, unitId, teamId }
+  });
+};
+
+export const addUserApi = (data: any) => {
+  return axiosInstance.post("/user/create", data);
+};
+
+export const updateUserApi = (id: string, data: any) => {
+  return axiosInstance.put(`/user/${id}`, data);
+};
+
+export const deleteUserApi = (id: string) => {
+  return axiosInstance.delete(`/user/${id}`);
+};

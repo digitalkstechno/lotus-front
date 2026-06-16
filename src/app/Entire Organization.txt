@@ -1,0 +1,4 @@
+Entire Organization
+12 members found
+
+by deatulk staff route me hamara entire organization wala hai wo select aaayega and waha pr hamare jitne user hai uska pagination vala api call hoga and uske sath sath search ka bhi funcitnlity hofa search ki api me us hisab se pehle integrate karege and uske bad uske sath sath add user vala jo hai wo bhi integrate karege api uske sath sath hame uske under team and 
