@@ -21,7 +21,7 @@ export default function Master2Page() {
     const [form, setForm] = useState({ particulars: "", category: "", maxScore: "", weightage: "", order: "" });
     const [errors, setErrors] = useState<{ particulars?: string; category?: string; maxScore?: string; weightage?: string }>({});
     const dragItem = useRef<number | null>(null);
-    const dragOver = useRef<number | null>(null);
+    const dragOver = useRef<number | null>(null)
 
     const openDrawer = () => {
         setEditingId(null);
@@ -75,7 +75,7 @@ export default function Master2Page() {
     return (
         <div className="flex flex-col h-screen w-full overflow-hidden bg-white font-sans text-xs">
             <div className="bg-emerald-700 text-white px-6 py-4 shadow-md shrink-0 flex items-center gap-3">
-                <button onClick={() => router.back()} className="p-1.5 rounded-full hover:bg-white/20 transition-colors">
+                <button onClick={() => router.back()} className="p-1.5 rounded-full bg-white/20 transition-colors">
                     <ArrowLeft className="w-4 h-4" />
                 </button>
                 <div>

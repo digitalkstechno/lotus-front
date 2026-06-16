@@ -18,21 +18,21 @@ export default function Master1Page() {
   const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState({ name: "", weightage: "" });
-  const [errors, setErrors] = useState<{ name?: string; weightage?: string }>({});
+  const [form, setForm] = useState({ name: "", weightage: "", order: "" });
+  const [errors, setErrors] = useState<{ name?: string; weightage?: string; order?: string }>({});
   const dragItem = useRef<number | null>(null);
   const dragOver = useRef<number | null>(null);
 
   const openDrawer = () => {
     setEditingId(null);
-    setForm({ name: "", weightage: "" });
+    setForm({ name: "", weightage: "", order: String(items.length + 1) });
     setErrors({});
     setDrawerOpen(true);
   };
 
   const openEdit = (item: Item) => {
     setEditingId(item.id);
-    setForm({ name: item.name, weightage: String(item.weightage) });
+    setForm({ name: item.name, weightage: String(item.weightage), order: String(item.order) });
     setErrors({});
     setDrawerOpen(true);
   };
@@ -40,19 +40,20 @@ export default function Master1Page() {
   const closeDrawer = () => {
     setDrawerOpen(false);
     setEditingId(null);
-    setForm({ name: "", weightage: "" });
+    setForm({ name: "", weightage: "", order: "" });
     setErrors({});
   };
 
   const handleSave = () => {
-    const e: { name?: string; weightage?: string } = {};
+    const e: { name?: string; weightage?: string; order?: string } = {};
     if (!form.name.trim()) e.name = "Required";
     if (!form.weightage || isNaN(Number(form.weightage))) e.weightage = "Required";
+    if (!form.order || isNaN(Number(form.order))) e.order = "Required";
     if (Object.keys(e).length) { setErrors(e); return; }
     if (editingId !== null) {
-      setItems((prev) => prev.map((i) => i.id === editingId ? { ...i, name: form.name.trim(), weightage: Number(form.weightage) } : i));
+      setItems((prev) => prev.map((i) => i.id === editingId ? { ...i, name: form.name.trim(), weightage: Number(form.weightage), order: Number(form.order) } : i));
     } else {
-      setItems((prev) => [...prev, { id: Date.now(), name: form.name.trim(), weightage: Number(form.weightage), order: prev.length + 1 }]);
+      setItems((prev) => [...prev, { id: Date.now(), name: form.name.trim(), weightage: Number(form.weightage), order: Number(form.order) }]);
     }
     closeDrawer();
   };
@@ -72,7 +73,7 @@ export default function Master1Page() {
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-white font-sans text-xs">
       <div className="bg-emerald-700 text-white px-6 py-4 shadow-md shrink-0 flex items-center gap-3">
-        <button onClick={() => router.back()} className="p-1.5 rounded-full hover:bg-white/20 transition-colors">
+        <button onClick={() => router.back()} className="p-1.5 rounded-full bg-white/20 transition-colors">
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div>
@@ -98,7 +99,8 @@ export default function Master1Page() {
                 <th className="px-3 py-3 w-8"></th>
                 <th className="px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-10">#</th>
                 <th className="px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Name</th>
-                <th className="px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-right">Weightage</th>
+                <th className="px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Order</th>
+                <th className="px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Weightage</th>
                 <th className="px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-right">Action</th>
               </tr>
             </thead>
@@ -121,7 +123,8 @@ export default function Master1Page() {
                     </td>
                     <td className="px-4 py-3.5 text-xs text-slate-400">{idx + 1}</td>
                     <td className="px-4 py-3.5 text-sm font-medium text-slate-800">{item.name}</td>
-                    <td className="px-4 py-3.5 text-sm text-slate-600 text-right">{item.weightage}%</td>
+                    <td className="px-4 py-3.5 text-sm text-slate-600">{item.order}</td>
+                    <td className="px-4 py-3.5 text-sm text-slate-600">{item.weightage}%</td>
                     <td className="px-4 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => openEdit(item)} className="p-1.5 rounded-lg text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">
@@ -163,6 +166,11 @@ export default function Master1Page() {
                     <label className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">Weightage (%) <span className="text-red-500">*</span></label>
                     <input type="number" min="0" value={form.weightage} onChange={(e) => { setForm((f) => ({ ...f, weightage: e.target.value })); setErrors((er) => ({ ...er, weightage: "" })); }} placeholder="e.g. 20" className={`w-full bg-gray-100 text-slate-800 placeholder-slate-400 border-0 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm ${errors.weightage ? "ring-2 ring-red-400" : ""}`} />
                     {errors.weightage && <p className="text-xs text-red-500">{errors.weightage}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">Order <span className="text-red-500">*</span></label>
+                    <input type="number" min="1" value={form.order} onChange={(e) => { setForm((f) => ({ ...f, order: e.target.value })); setErrors((er) => ({ ...er, order: "" })); }} placeholder="e.g. 1" className={`w-full bg-gray-100 text-slate-800 placeholder-slate-400 border-0 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm ${errors.order ? "ring-2 ring-red-400" : ""}`} />
+                    {errors.order && <p className="text-xs text-red-500">{errors.order}</p>}
                   </div>
                   <button onClick={handleSave} className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-semibold transition-colors text-sm">Save</button>
                 </div>

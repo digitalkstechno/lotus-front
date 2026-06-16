@@ -567,8 +567,8 @@ function App() {
   const [dragOverTarget, setDragOverTarget] = useState(null);
 
   /* ----------------- generic deep helpers ----------------- */
-  const findTaskEverywhere = (taskId) => {
-    for (const l of lists) {
+  const findTaskEverywhere = (taskId, listsData = lists) => {
+    for (const l of listsData) {
       for (const t of l.tasks) {
         if (t.id === taskId) return { task: t, listId: l.id, parentId: null };
         const s = t.subtasks.find((s) => s.id === taskId);
@@ -892,6 +892,7 @@ function App() {
       next = next.map((l) => (l.id === listId ? { ...l, tasks: [...l.tasks, task] } : l));
       return next;
     });
+    setEditingTaskId(null);
   };
 
   const indentTask = (taskId, listId) => {
@@ -913,6 +914,7 @@ function App() {
         return { ...l, tasks: updatedTasks };
       })
     );
+    setEditingTaskId(null);
     setOpenTaskMenu(null);
   };
 
@@ -953,7 +955,55 @@ function App() {
                 onFocus={(e) => e.target.setSelectionRange(e.target.value.length, e.target.value.length)}
                 value={task.title}
                 onChange={(e) => setTitle(task.id, e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); return; }
+                  if (e.key === "Tab") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (e.shiftKey) {
+                      // Shift+Tab: unindent
+                      setLists((prev) => {
+                        const found = findTaskEverywhere(task.id, prev);
+                        if (!found || !found.parentId) return prev;
+                        return prev.map((l) => {
+                          if (l.id !== found.listId) return l;
+                          const pIdx = l.tasks.findIndex((t) => t.id === found.parentId);
+                          if (pIdx === -1) return l;
+                          const taskCopy = { ...found.task, subtasks: found.task.subtasks || [] };
+                          const newTasks = [...l.tasks.map((t) =>
+                            t.id === found.parentId
+                              ? { ...t, subtasks: t.subtasks.filter((s) => s.id !== task.id) }
+                              : t
+                          )];
+                          newTasks.splice(pIdx + 1, 0, taskCopy);
+                          return { ...l, tasks: newTasks };
+                        });
+                      });
+                    } else {
+                      // Tab: indent
+                      setLists((prev) => {
+                        const found = findTaskEverywhere(task.id, prev);
+                        if (!found || found.parentId) return prev;
+                        return prev.map((l) => {
+                          if (l.id !== found.listId) return l;
+                          const idx = l.tasks.findIndex((t) => t.id === task.id);
+                          if (idx <= 0) return l;
+                          const newParent = l.tasks[idx - 1];
+                          if (newParent.completed) return l;
+                          const taskCopy = { ...l.tasks[idx], subtasks: [] };
+                          return {
+                            ...l,
+                            tasks: l.tasks.filter((_, i) => i !== idx).map((t) =>
+                              t.id === newParent.id ? { ...t, subtasks: [...t.subtasks, taskCopy] } : t
+                            )
+                          };
+                        });
+                      });
+                    }
+                    setEditingTaskId(null);
+                    return;
+                  }
+                }}
                 placeholder="Title"
                 className={`flex-1 text-sm bg-transparent focus:outline-none border-b border-emerald-500 pb-0.5 ${task.completed ? "text-gray-400 line-through" : "text-gray-800"
                   }`}
@@ -981,8 +1031,10 @@ function App() {
                             Indent
                           </MenuItem>
                           <MenuItem icon={CornerDownRight} onClick={() => {
+                            const sub = newTask("");
+                            updateTaskEverywhere(task.id, (t) => ({ ...t, subtasks: [...t.subtasks, sub] }));
+                            setEditingTaskId(sub.id);
                             setOpenTaskMenu(null);
-                            setNewSubtaskInputs(p => ({ ...p, [task.id]: "" }));
                           }}>
                             Add a subtask
                           </MenuItem>
@@ -1324,6 +1376,9 @@ function App() {
                           setOpenTaskMenu(null);
                         }}>
                           Add a subtask
+                        </MenuItem>
+                        <MenuItem icon={CornerDownRight} onClick={() => { indentTask(task.id, list.id); setOpenTaskMenu(null); }}>
+                          Indent
                         </MenuItem>
                         <MenuItem icon={Paperclip} onClick={() => { setOpenTaskMenu(null); document.getElementById(`att-input-non-${task.id}`)?.click(); }}>
                           Add attachment
