@@ -6,6 +6,10 @@ export const getMaster2AllApi = (search: string) => {
   });
 };
 
+export const getMaster2ByMaster1Api = (master1Id: string) => {
+  return axiosInstance.get(`/master2/master1/${master1Id}`);
+};
+
 export const addMaster2Api = (data: any) => {
   return axiosInstance.post("/master2/create", data);
 };

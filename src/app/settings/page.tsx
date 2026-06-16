@@ -6,7 +6,7 @@ import { X, Plus, Trash2, Edit2, GripVertical, ArrowLeft, ChevronDown, ChevronRi
 import { motion, AnimatePresence } from "motion/react";
 import { AppDispatch, RootState } from "../../redux/store";
 import { fetchMaster1All, addMaster1, updateMaster1, deleteMaster1 } from "../../redux/slices/master1Slice";
-import { fetchMaster2All, addMaster2, updateMaster2, deleteMaster2 } from "../../redux/slices/master2Slice";
+import { fetchMaster2ByMaster1, addMaster2, updateMaster2, deleteMaster2 } from "../../redux/slices/master2Slice";
 
 type Master1Item = { id: string; name: string; weightage: number; order: number };
 type Master2Item = { id: string; master1Id: string; master1Name: string; particulars: string; category: string; maxScore: number; order: number };
@@ -26,7 +26,7 @@ export default function UnifiedMastersPage() {
 
     useEffect(() => {
         dispatch(fetchMaster1All({ search: "" }));
-        dispatch(fetchMaster2All({ search: "" }));
+        // Removed fetchMaster2All; now fetched lazily per row
     }, [dispatch]);
 
     useEffect(() => {
@@ -42,7 +42,13 @@ export default function UnifiedMastersPage() {
     }, [master2State.items]);
 
     const toggleExpand = (id: string) => {
-        setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
+        setExpanded(prev => {
+            const isExpanding = !prev[id];
+            if (isExpanding) {
+                dispatch(fetchMaster2ByMaster1(id));
+            }
+            return { ...prev, [id]: isExpanding };
+        });
     };
 
     // ----- DRAWER STATES -----
@@ -128,7 +134,8 @@ export default function UnifiedMastersPage() {
                 const childCount = localMaster2.filter(m2 => m2.master1Id === m2Form.master1Id).length;
                 await dispatch(addMaster2({ master1Id: m2Form.master1Id, name: m2Form.particulars.trim(), category: m2Form.category.trim(), maxScore: Number(m2Form.maxScore), order: childCount + 1 })).unwrap();
             }
-            dispatch(fetchMaster2All({ search: "" }));
+            dispatch(fetchMaster2ByMaster1(m2Form.master1Id));
+            dispatch(fetchMaster1All({ search: "" })); // Refetch M1 to update totalWeight
             closeDrawer();
         } catch (err: any) {
             setM2Errors({ particulars: err.message || "Operation failed" });
@@ -143,10 +150,11 @@ export default function UnifiedMastersPage() {
         }
     };
 
-    const deleteM2 = async (id: string) => {
+    const deleteM2 = async (id: string, parentId: string) => {
         if (confirm("Delete this Master 2 record?")) {
             await dispatch(deleteMaster2(id)).unwrap();
-            dispatch(fetchMaster2All({ search: "" }));
+            dispatch(fetchMaster2ByMaster1(parentId));
+            dispatch(fetchMaster1All({ search: "" }));
         }
     };
 
@@ -203,7 +211,7 @@ export default function UnifiedMastersPage() {
         try {
             await Promise.all(reorderedChildren.map(item => dispatch(updateMaster2({ id: item.id, data: { order: item.order } })).unwrap()));
         } catch (err) {
-            dispatch(fetchMaster2All({ search: "" }));
+            dispatch(fetchMaster2ByMaster1(parentId));
         }
     };
 
@@ -333,7 +341,7 @@ export default function UnifiedMastersPage() {
                                                                                         <button onClick={() => openEditMaster2(m2)} className="p-1 rounded text-slate-500 hover:bg-slate-200 transition-colors">
                                                                                             <Edit2 className="w-3 h-3" />
                                                                                         </button>
-                                                                                        <button onClick={() => deleteM2(m2.id)} className="p-1 rounded text-red-400 hover:bg-red-100 transition-colors">
+                                                                                        <button onClick={() => deleteM2(m2.id, m1.id)} className="p-1 rounded text-red-400 hover:bg-red-100 transition-colors">
                                                                                             <Trash2 className="w-3 h-3" />
                                                                                         </button>
                                                                                     </div>

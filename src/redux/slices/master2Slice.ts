@@ -13,6 +13,18 @@ export const fetchMaster2All = createAsyncThunk(
   }
 );
 
+export const fetchMaster2ByMaster1 = createAsyncThunk(
+  "master2/fetchByMaster1",
+  async (master1Id: string, { rejectWithValue }) => {
+    try {
+      const response = await master2Api.getMaster2ByMaster1Api(master1Id);
+      return { master1Id, data: response.data.data || response.data };
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data || "Failed to fetch master2 by parent");
+    }
+  }
+);
+
 export const addMaster2 = createAsyncThunk("master2/add", async (data: any, { rejectWithValue }) => {
   try {
     const payload = {
@@ -83,6 +95,29 @@ const master2Slice = createSlice({
       if (action.payload.totalRecords !== undefined) state.pagination.total = action.payload.totalRecords;
     });
     builder.addCase(fetchMaster2All.rejected, (state, action) => { state.loading = false; state.error = action.payload as string; });
+
+    // fetch by master1
+    builder.addCase(fetchMaster2ByMaster1.pending, (state) => { state.loading = true; state.error = null; });
+    builder.addCase(fetchMaster2ByMaster1.fulfilled, (state, action) => {
+      state.loading = false;
+      const { master1Id, data } = action.payload;
+      
+      // Filter out existing items for this parent to replace them fresh
+      const otherItems = state.items.filter(item => item.master1Id !== master1Id);
+      
+      const newItems = Array.isArray(data) ? data.map((d: any) => ({
+        ...d,
+        id: d._id || d.id,
+        name: d.particulars,
+        category: d.category,
+        maxScore: d.max_score,
+        master1Id: d.master1_id?._id || d.master1_id,
+        master1Name: d.master1_id?.type || ""
+      })) : [];
+
+      state.items = [...otherItems, ...newItems];
+    });
+    builder.addCase(fetchMaster2ByMaster1.rejected, (state, action) => { state.loading = false; state.error = action.payload as string; });
 
     // add
     builder.addCase(addMaster2.fulfilled, (state, action) => { state.items.push(action.payload); state.pagination.total += 1; });
