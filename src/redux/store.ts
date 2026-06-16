@@ -3,6 +3,8 @@ import authReducer from "./slices/authSlice";
 import unitReducer from "./slices/unitSlice";
 import teamReducer from "./slices/teamSlice";
 import userReducer from "./slices/userSlice";
+import master1Reducer from "./slices/master1Slice";
+import master2Reducer from "./slices/master2Slice";
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +12,8 @@ export const store = configureStore({
     units: unitReducer,
     teams: teamReducer,
     users: userReducer,
+    master1: master1Reducer,
+    master2: master2Reducer,
     // Add other reducers here as you build your app
   },
   devTools: process.env.NODE_ENV !== "production",
