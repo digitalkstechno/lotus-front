@@ -224,7 +224,7 @@ export default function AddChecklist() {
               <tbody>
                 {items.map((it, i) => (
                   <tr key={it.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50/60"}>
-                    <td className="px-2 py-2 text-gray-300 text-[10px]">{it.id}</td>
+                    <td className="px-2 py-2 text-gray-300 text-[10px]">{i + 1}</td>
                     <td className="px-2 py-2 text-gray-700 leading-snug max-w-[220px]">{it.text}</td>
                     <td className="px-2 py-2 text-center">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${it.cat === "Vital" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
