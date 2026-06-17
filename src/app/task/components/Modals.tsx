@@ -18,7 +18,13 @@ export const CalendarPicker = ({
   onDelete?: any;
 }) => {
   const today = new Date();
-  const initDate = value ? new Date(value) : today;
+  let initDate = today;
+  if (value) {
+    const parsed = new Date(value);
+    if (!isNaN(parsed.getTime())) {
+      initDate = parsed;
+    }
+  }
   const [viewYear, setViewYear] = useState(initDate.getFullYear());
   const [viewMonth, setViewMonth] = useState(initDate.getMonth());
   const [selected, setSelected] = useState(value || null);

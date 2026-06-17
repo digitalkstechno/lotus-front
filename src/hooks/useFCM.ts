@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { getToken, onMessage } from "firebase/messaging";
 import { messaging } from "@/lib/firebase";
 import { saveFcmTokenApi } from "@/services/userService";
+import { toast } from "sonner";
 
 export default function useFCM() {
   useEffect(() => {
@@ -46,8 +47,25 @@ export default function useFCM() {
     if (messaging) {
       const unsubscribe = onMessage(messaging, (payload) => {
         console.log("Foreground Message received:", payload);
-        // Yaha par aap apna toast notification dikha sakte ho (e.g. react-hot-toast, sonner)
-        // alert(`New notification: ${payload.notification?.title}`);
+        if (payload.notification) {
+          // Fallback to sonner toast for in-app UI
+          toast(payload.notification.title || "New Notification", {
+            description: payload.notification.body,
+            duration: 5000,
+            icon: "🔔"
+          });
+
+          // Also trigger the native OS notification via Service Worker
+          if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.ready.then((registration) => {
+              registration.showNotification(payload.notification!.title || "New Notification", {
+                body: payload.notification!.body,
+                icon: "/favicon.ico",
+                data: payload.data,
+              });
+            });
+          }
+        }
       });
       return () => {
         unsubscribe(); // Clean up listener
