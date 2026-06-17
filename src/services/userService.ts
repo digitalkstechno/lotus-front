@@ -25,3 +25,12 @@ export const deleteUserApi = (id: string) => {
 export const getUserByIdApi = (id: string) => {
   return axiosInstance.get(`/user/${id}`);
 };
+
+export const searchUsersApi = (query: string) => {
+  return axiosInstance.get(`/user/search`, { params: { query } });
+};
+
+// POST /user/save-fcm
+export const saveFcmTokenApi = (fcmToken: string) => {
+  return axiosInstance.post(`/user/save-fcm`, { fcmToken });
+};

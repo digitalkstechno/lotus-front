@@ -5,6 +5,7 @@
 import { useEffect } from "react";
 import { getToken, onMessage } from "firebase/messaging";
 import { messaging } from "@/lib/firebase";
+import { saveFcmTokenApi } from "@/services/userService";
 
 export default function useFCM() {
   useEffect(() => {
@@ -26,19 +27,13 @@ export default function useFCM() {
         if (currentToken) {
           console.log("FCM Token:", currentToken);
 
-          // backend me save karo
-          // Abhi ke liye API call comment kiya hai, baad me call kar lena
-          /*
-          await fetch("/api/save-token", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              token: currentToken,
-            }),
-          });
-          */
+          // Call the backend API to save the FCM token
+          try {
+            await saveFcmTokenApi(currentToken);
+            console.log("FCM Token saved to backend successfully.");
+          } catch (err) {
+            console.error("Failed to save FCM token to backend", err);
+          }
         }
       } catch (error) {
         console.error("FCM Error:", error);
