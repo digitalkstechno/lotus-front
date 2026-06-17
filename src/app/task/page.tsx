@@ -157,7 +157,6 @@ function AppContent() {
               value={getTask(repeatFor)?.repeat}
               onChange={(repeatData: any, timeStr?: string | null) => {
                 setRepeat(repeatFor, { enabled: true, ...repeatData });
-                if (timeStr) setDueTime(repeatFor, timeStr);
               }}
               onClose={() => setRepeatFor(null)}
             />

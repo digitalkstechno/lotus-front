@@ -371,7 +371,7 @@ export const useTasks = () => {
       const found = findTaskEverywhere(taskId, currentLists);
       if (found && (found.task as any).isNew && authUser) {
         const payload = {
-          title: found.task.title || "New Task",
+          title: found.task.title || "",
           description: found.task.details || "",
           date: found.task.dueDate || new Date().toISOString(),
           assigned_to_user: found.task.assign?.id || null,
@@ -439,7 +439,7 @@ export const useTasks = () => {
 
   const addTaskToList = (listId: string) => {
     if (!listId) return;
-    const title = "New Task";
+    const title = "";
     const t = newTask(title);
     t.listId = listId;
     (t as any).isNew = true;
