@@ -3,10 +3,8 @@
 import { useRouter, useParams } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { useChecklist } from "../../context";
-import {  ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
-
-// ─── Inline Editable Field ────────────────────────────────────────────────────
 function InlineField({ label, value, onChange, type = "text", placeholder = "Click to edit..." }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -34,7 +32,6 @@ function InlineField({ label, value, onChange, type = "text", placeholder = "Cli
   );
 }
 
-// ─── Inline Yes/No Cell ───────────────────────────────────────────────────────
 function YnCell({ value, onChange }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -64,7 +61,6 @@ function YnCell({ value, onChange }) {
   );
 }
 
-// ─── Inline Score Cell ────────────────────────────────────────────────────────
 function ScoreCell({ value, max, onChange }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -90,7 +86,6 @@ function ScoreCell({ value, max, onChange }) {
   );
 }
 
-// ─── Inline Remarks Cell ──────────────────────────────────────────────────────
 function RemarksCell({ value, onChange }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -112,32 +107,70 @@ function RemarksCell({ value, onChange }) {
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
 export default function EditRecord() {
   const router = useRouter();
   const params = useParams();
-  const { getRecord, updateRecord, loaded } = useChecklist();
+  const { getRecord, updateRecord } = useChecklist();
 
-  const record = loaded ? getRecord(params.id) : null;
-
-  const [info, setInfo] = useState(null);
+  const [record, setRecord] = useState(null);
+  const [info, setInfoState] = useState(null);
   const [items, setItems] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
+  const [loading, setLoading] = useState(true);
 
+  // API thi record fetch karo
   useEffect(() => {
-    if (record) {
-      setInfo({ ...record.info });
-      setItems(record.items.map((it) => ({ ...it })));
-    }
-  }, [record?.id]);
+    async function load() {
+      setLoading(true);
+      const data = await getRecord(params.id);
+      if (data) {
+        setRecord(data);
 
-  if (!loaded || !info || !items) {
+        // Info fields set karo
+        setInfoState({
+          nameOf3PL: data.name_of_3pl || "",
+          location: data.location || "",
+          personMet: data.person_met || "",
+          designation: data.designation || "",
+          assessedBy: data.assessed_by || "",
+          date: data.date ? data.date.split("T")[0] : "",
+          month: data.month || "",
+          periodFrom: data.assessment_period?.split(" to ")?.[0] || "",
+          periodTo: data.assessment_period?.split(" to ")?.[1] || "",
+        });
+
+        // Items set karo — API data thi
+        const flatItems = [];
+        data.data?.forEach((section) => {
+          section.data?.forEach((item) => {
+            flatItems.push({
+              id: item._id,
+              master2: item.master2?._id || item.master2,
+              master1: section.master1?._id || section.master1,
+              text: item.master2?.particulars || "—",
+              cat: item.master2?.category || "—",
+              max: item.master2?.max_score || 0,
+              yn: item.isRequired ? "Yes" : "No",
+              score: item.score,
+              remarks: item.remarks || "",
+            });
+          });
+        });
+        setItems(flatItems);
+      }
+      setLoading(false);
+    }
+    load();
+  }, [params.id]);
+
+  if (loading || !info || !items) {
     return <div className="min-h-screen flex items-center justify-center text-gray-400 text-sm">Loading...</div>;
   }
 
   if (!record) {
     return (
-      <div className="min-h-screen bg-[#f8fafc]flex flex-col items-center justify-center gap-3">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3">
         <p className="text-sm text-gray-500">Record not found</p>
         <button onClick={() => router.push("/checklist")}
           className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
@@ -148,7 +181,7 @@ export default function EditRecord() {
   }
 
   function setInfoField(key) {
-    return (val) => setInfo((p) => ({ ...p, [key]: val }));
+    return (val) => setInfoState((p) => ({ ...p, [key]: val }));
   }
 
   function updateItem(id, field, val) {
@@ -170,27 +203,64 @@ export default function EditRecord() {
       ? `${formatDate(info.periodFrom)} to ${formatDate(info.periodTo)}`
       : "—";
 
-  function handleSave() {
-    updateRecord(record.id, { info, items, totalScore, maxScore });
-    setSavedMsg(true);
-    setTimeout(() => {
-      setSavedMsg(false);
-      router.push(`/checklist/view/${record.id}`);
-    }, 600);
+  // API payload banavo
+  function buildPayload() {
+    const sectionMap = {};
+    items.forEach((it) => {
+      if (!it.master1) return;
+      if (!sectionMap[it.master1]) sectionMap[it.master1] = [];
+      sectionMap[it.master1].push({
+        master2: it.master2,
+        score: it.score,
+        isRequired: it.yn === "Yes",
+        remarks: it.remarks,
+      });
+    });
+
+    return {
+      name_of_3pl: info.nameOf3PL,
+      person_met: info.personMet,
+      assessed_by: info.assessedBy,
+      month: info.month,
+      location: info.location,
+      designation: info.designation,
+      date: info.date || null,
+      assessment_period:
+        info.periodFrom && info.periodTo
+          ? `${info.periodFrom} to ${info.periodTo}`
+          : "",
+      data: Object.entries(sectionMap).map(([master1, data]) => ({ master1, data })),
+    };
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    const payload = buildPayload();
+    const result = await updateRecord(record._id, payload);
+    setSaving(false);
+
+    if (result?.success) {
+      setSavedMsg(true);
+      setTimeout(() => {
+        setSavedMsg(false);
+        router.push(`/checklist/view/${record._id}`);
+      }, 600);
+    } else {
+      alert("Save failed! Please try again.");
+    }
   }
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
-      {/* Top Bar */}
       <div className="bg-emerald-700 text-white px-4 py-3 flex items-center gap-3 sticky top-0 z-20 shadow-md">
         <button onClick={() => router.push("/checklist")}
           className="p-1.5 rounded-full bg-white/20 text-white flex items-center justify-center text-lg flex-shrink-0">
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div className="flex-1">
-          <p className="font-semibold text-sm leading-tight">Edit Record #{record.slipNo}</p>
+          <p className="font-semibold text-sm leading-tight">Edit Record</p>
           <p className="text-[11px] opacity-80 mt-0.5">
-            {displayVal(info.nameOf3PL, "Lotus Marketing")} · {displayVal(info.location, "NIYOL")}
+            {displayVal(info.nameOf3PL, "3PL")} · {displayVal(info.location, "Location")}
           </p>
         </div>
       </div>
@@ -198,21 +268,17 @@ export default function EditRecord() {
       <div className="px-2.5 py-3 pb-10">
         <div className="bg-white rounded-tr-xl rounded-b-xl overflow-hidden shadow-md">
 
-          {/* Bubble header */}
           <div className="bg-emerald-50 text-emerald-700 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
             <div>
               <p className="font-semibold text-sm">Secondary Warehouse – Self Assessment Checklist</p>
               <p className="text-xs opacity-80 mt-1">Assessment Period: {periodStr}</p>
             </div>
-            <button
-              onClick={handleSave}
-              className="text-white bg-emerald-600 text-xs font-semibold px-4 py-1.5 rounded-lg shadow transition-colors disabled:opacity-60 flex-shrink-0"
-            >
-              {savedMsg ? "✓ Saved" : "💾 Save"}
+            <button onClick={handleSave} disabled={saving}
+              className="text-white bg-emerald-600 text-xs font-semibold px-4 py-1.5 rounded-lg shadow transition-colors disabled:opacity-60 flex-shrink-0">
+              {savedMsg ? "✓ Saved" : saving ? "Saving..." : "💾 Save"}
             </button>
           </div>
 
-          {/* Inline editable info grid */}
           <div className="grid grid-cols-2 divide-x divide-y divide-gray-100">
             <InlineField label="Name of 3PL"  value={info.nameOf3PL}   onChange={setInfoField("nameOf3PL")}   placeholder="e.g. Lotus Marketing" />
             <InlineField label="Location"      value={info.location}    onChange={setInfoField("location")}    placeholder="e.g. NIYOL" />
@@ -239,12 +305,10 @@ export default function EditRecord() {
             </div>
           </div>
 
-          {/* Section header */}
           <div className="bg-emerald-50 border-y border-emerald-100 px-4 py-2">
             <p className="text-xs font-semibold text-emerald-700 tracking-wide">▶ Operations</p>
           </div>
 
-          {/* Checklist Table */}
           <div className="overflow-x-auto">
             <table className="w-full text-xs" style={{ minWidth: 680 }}>
               <thead>
@@ -261,7 +325,7 @@ export default function EditRecord() {
               <tbody>
                 {items.map((it, i) => (
                   <tr key={it.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50/60"}>
-                    <td className="px-2 py-2 text-gray-300 text-[10px]">{it.id}</td>
+                    <td className="px-2 py-2 text-gray-300 text-[10px]">{i + 1}</td>
                     <td className="px-2 py-2 text-gray-700 leading-snug max-w-[220px]">{it.text}</td>
                     <td className="px-2 py-2 text-center">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${it.cat === "Vital" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
@@ -284,7 +348,6 @@ export default function EditRecord() {
             </table>
           </div>
 
-          {/* Footer */}
           <div className="bg-gray-50 border-t border-gray-100 px-4 py-3 flex items-center justify-between flex-wrap gap-3">
             <p className="text-xs font-semibold text-gray-500">Weighted Average = 30</p>
             <div className="flex gap-5">

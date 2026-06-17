@@ -2,7 +2,6 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import * as listApi from "../../services/listService";
 import { getTasksByListAndUserApi } from "../../services/taskService";
 
-// Fetch user na lists
 export const fetchListsByUser = createAsyncThunk(
   "lists/fetchByUser",
   async ({ userId, page = 1, limit = 10, isChecked }: { userId: string, page?: number, limit?: number, isChecked?: boolean }, { rejectWithValue }) => {

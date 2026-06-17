@@ -133,16 +133,21 @@ export default function AddChecklist() {
       ? `${formatDate(info.periodFrom)} to ${formatDate(info.periodTo)}`
       : "—";
 
-  function handleSave() {
-    setSaving(true);
-    saveRecord();
-    setSaving(false);
+  async function handleSave() {
+  setSaving(true);
+  const result = await saveRecord(); 
+  setSaving(false);
+  
+  if (result?.success) {
     setSavedMsg(true);
     setTimeout(() => {
       setSavedMsg(false);
       router.push("/checklist/records");
     }, 600);
+  } else {
+    alert("Save failed! Please try again.");
   }
+}
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">

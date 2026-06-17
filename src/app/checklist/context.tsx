@@ -1,29 +1,7 @@
 "use client";
 import { createContext, useContext, useState, useEffect } from "react";
-
-const INITIAL_ITEMS = [
-  { id: 1, text: "Physical stock (Grade / Batch / BIN) is matching with SAP Counting done daily basis & record available", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-  { id: 2, text: "Empty Pellet stock Physical vs System is matching (Wherever applicable)", cat: "Essential", max: 2, yn: "Yes", score: 2, remarks: "" },
-  { id: 3, text: "Monitoring the Goods in transit and escalate for not receipt of vehicle on time", cat: "Essential", max: 2, yn: "Yes", score: 2, remarks: "" },
-  { id: 4, text: "Check for MGX process (System Vs Physical)", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-  { id: 5, text: "Stock is maintained as per the Stacking Norms / BIN Capacity – For Polymer/Elastomer (considering Infrastructure Constraints)", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-  { id: 6, text: "In case Of High stock escalate to Regional business / Zonal coordinator", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-  { id: 7, text: "Designated area for keep CTTN / WET / Block BIN and damage bags", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-  { id: 8, text: "Timely circulation of daily MIS with correct data and authenticity", cat: "Essential", max: 2, yn: "Yes", score: 2, remarks: "" },
-  { id: 9, text: "Awareness of Logging Incident in SAP (ref SOP 2.18)", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-  { id: 10, text: "FIFO process is followed for Polymer / Elastomer / Polyester", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-  { id: 11, text: "Accounting of Wet and Shortage is done properly", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-  { id: 12, text: "There is no unattended stock discrepancy", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-  { id: 13, text: "Vehicles for Loading/Unloading is taken on FIFO Basis (Check for System report)", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-  { id: 14, text: "Follow-up done with regional team for unaccounted Stock, Pallets, Promotional Items, Empty bag, Samples in WH", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-  { id: 15, text: "Gap is maintained between wall and Stack", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-  { id: 16, text: "Check for Additional bins created and material available in same bins (Physical Check)", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-  { id: 17, text: "Loading and Unloading Charges Collected as per approved rates", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-  { id: 18, text: "Employees are wearing the ID Cards and Uniform", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-  { id: 19, text: "Aisles are clear of stocks for free movement of Labour and MHE's", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-  { id: 20, text: "Overnight stay of truckers inside w/h compound not allowed", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "Drivers parked their vehicle on village road if we not allow him in premises, therefore we have to allow vehicles if any reported in night" },
-  { id: 21, text: "Proper locking and sealing process is followed", cat: "Vital", max: 3, yn: "Yes", score: 3, remarks: "" },
-];
+import { createChecklistApi, getChecklistsApi, updateChecklistApi } from "../../services/checklistService";
+import axiosInstance from "../../utils/axios";
 
 const INITIAL_INFO = {
   nameOf3PL: "",
@@ -37,100 +15,194 @@ const INITIAL_INFO = {
   periodTo: "",
 };
 
-const DATA_KEY = "warehouse-checklist-data";
-const RECORDS_KEY = "warehouse-checklist-records";
-
 const ChecklistContext = createContext(null);
 
 export function ChecklistProvider({ children }) {
-  const [items, setItems] = useState(INITIAL_ITEMS);
+  const [items, setItems] = useState([]);       
   const [info, setInfo] = useState(INITIAL_INFO);
   const [records, setRecords] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [fetchingRecords, setFetchingRecords] = useState(false);
 
-  // Load from localStorage on mount
-  useEffect(() => {
+  async function getRecord(id) {
     try {
-      const raw = localStorage.getItem(DATA_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed.items) setItems(parsed.items);
-        if (parsed.info) setInfo(parsed.info);
+      if(typeof window !== "undefined" && localStorage.getItem("token")){
+        const res = await axiosInstance.get(`/checklist/${id}`);
+        return res.data?.data || res.data;
       }
-      const rawRecords = localStorage.getItem(RECORDS_KEY);
-      if (rawRecords) setRecords(JSON.parse(rawRecords));
     } catch (e) {
-      console.error("Failed to load checklist data", e);
+      console.error("Failed to fetch record", e);
+      return null;
     }
-    setLoaded(true);
+  }
+
+  async function updateRecord(id, body) {
+    try {
+      if(typeof window !== "undefined" && localStorage.getItem("token")){
+        const res = await updateChecklistApi(id, body);
+        await fetchRecordsList(); // list refresh
+        return { success: true, data: res.data?.data || res.data };
+      }
+    } catch (e) {
+      console.error("Failed to update record", e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  // Master2 items fetch on mount
+  useEffect(() => {
+    async function fetchMaster2() {
+      try {
+        if(typeof window !== "undefined" && localStorage.getItem("token")){
+
+          const res = await axiosInstance.get("/master2");
+          const data = res.data?.data || [];
+  
+          // API response ne frontend format ma convert karo
+          const mapped = data.map((item) => ({
+            id: item._id,
+            master2: item._id,
+            master1: item.master1_id?._id,
+            master1Type: item.master1_id?.type,
+            text: item.particulars,
+            cat: item.category,
+            max: item.max_score,
+            yn: "Yes",
+            score: item.max_score, // default max score
+            remarks: "",
+            order: item.order,
+          }));
+  
+          // Order by section type then order field
+          mapped.sort((a, b) => {
+            if (a.master1Type < b.master1Type) return -1;
+            if (a.master1Type > b.master1Type) return 1;
+            return a.order - b.order;
+          });
+  
+          setItems(mapped);
+        }
+      } catch (e) {
+        console.error("Failed to fetch master2 items", e);
+      } finally {
+        setLoaded(true);
+      }
+    }
+
+    fetchMaster2();
+    fetchRecordsList();
   }, []);
 
-  // Persist current working draft
-  useEffect(() => {
-    if (!loaded) return;
+  // Records list fetch
+  async function fetchRecordsList(page = 1, limit = 10) {
+    setFetchingRecords(true);
     try {
-      localStorage.setItem(DATA_KEY, JSON.stringify({ items, info }));
+      if(typeof window !== "undefined" && localStorage.getItem("token")){
+        const res = await getChecklistsApi(page, limit);
+        const data = res.data?.data || [];
+        setRecords(data);
+      }
     } catch (e) {
-      console.error("Failed to save checklist data", e);
+      console.error("Failed to fetch records", e);
+    } finally {
+      setFetchingRecords(false);
     }
-  }, [items, info, loaded]);
-
-  // Persist saved records
-  useEffect(() => {
-    if (!loaded) return;
-    try {
-      localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
-    } catch (e) {
-      console.error("Failed to save records", e);
-    }
-  }, [records, loaded]);
+  }
 
   function updateItem(id, field, val) {
-    setItems((prev) => prev.map((it) => it.id === id ? { ...it, [field]: val } : it));
+    setItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, [field]: val } : it))
+    );
   }
 
   function setInfoField(key) {
     return (val) => setInfo((p) => ({ ...p, [key]: val }));
   }
 
-  // Save current info+items as a new record
-  function saveRecord() {
-    const totalScore = items.reduce((s, it) => s + it.score, 0);
-    const maxScore = items.reduce((s, it) => s + it.max, 0);
+  // Items ne master1 wise group karo — payload banava mate
+  function buildPayload() {
+    // master1 wise group
+    const sectionMap = {};
+    items.forEach((it) => {
+      if (!it.master1) return; // placeholder items skip
+      if (!sectionMap[it.master1]) {
+        sectionMap[it.master1] = [];
+      }
+      sectionMap[it.master1].push({
+        master2: it.master2,
+        score: it.score,
+        isRequired: it.yn === "Yes",
+        remarks: it.remarks,
+      });
+    });
 
-    const record = {
-      id: Date.now(),
-      slipNo: records.length + 1,
-      info: { ...info },
-      items: items.map((it) => ({ ...it })),
-      totalScore,
-      maxScore,
-      savedAt: new Date().toISOString(),
+    const sections = Object.entries(sectionMap).map(([master1, data]) => ({
+      master1,
+      data,
+    }));
+
+    const periodStr =
+      info.periodFrom && info.periodTo
+        ? `${info.periodFrom} to ${info.periodTo}`
+        : "";
+
+    return {
+      name_of_3pl: info.nameOf3PL,
+      person_met: info.personMet,
+      assessed_by: info.assessedBy,
+      month: info.month,
+      location: info.location,
+      designation: info.designation,
+      date: info.date || null,
+      assessment_period: periodStr,
+      is_checked: false,
+      data: sections,
     };
-
-    setRecords((prev) => [record, ...prev]);
-    return record;
   }
 
-  function updateRecord(id, patch) {
-    setRecords((prev) =>
-      prev.map((r) => (String(r.id) === String(id) ? { ...r, ...patch } : r))
+  // Save — API call
+ async function saveRecord() {
+  setSaving(true);
+  try {
+    const payload = buildPayload();
+    console.log("Payload being sent:", JSON.stringify(payload, null, 2)); // debug
+    const res = await createChecklistApi(payload);
+    const newRecord = res.data?.data || res.data;
+    await fetchRecordsList();
+    setInfo(INITIAL_INFO);
+    return { success: true, data: newRecord };
+  } catch (e) {
+    console.error("Save error:", e);
+    console.error("Error response:", e.response?.data); // actual backend error
+    return { success: false, error: e.message };
+  } finally {
+    setSaving(false);
+  }
+}
+
+  // Reset items to default scores
+  function resetItems() {
+    setItems((prev) =>
+      prev.map((it) => ({ ...it, yn: "Yes", score: it.max, remarks: "" }))
     );
-  }
-  function deleteRecord(id) {
-    setRecords((prev) => prev.filter((r) => r.id !== id));
-  }
-
-  function getRecord(id) {
-    return records.find((r) => String(r.id) === String(id));
   }
 
   return (
     <ChecklistContext.Provider
       value={{
-        items, info, records, loaded,
-        updateItem, setInfoField, setInfo,
-        saveRecord, deleteRecord, getRecord, updateRecord,
+        items,
+        info,
+        records,
+        loaded,
+        saving,
+        fetchingRecords,
+        updateItem,
+        setInfoField,
+        setInfo,
+        saveRecord,
+        fetchRecordsList,
+        resetItems, getRecord, updateRecord,
       }}
     >
       {children}

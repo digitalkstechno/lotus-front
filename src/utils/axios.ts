@@ -14,6 +14,9 @@ axiosInstance.interceptors.request.use(
   (config) => {
     // You can get the token from localStorage or cookies
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!localStorage.getItem("token") && typeof window !== "undefined" && window.location.pathname !== "/login") {
+       window.location.href = "/login"; 
+    }
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -35,7 +38,9 @@ axiosInstance.interceptors.response.use(
       console.error("Unauthorized! Token may have expired.");
       if (typeof window !== "undefined") {
         localStorage.removeItem("token");
-        window.location.href = "/login"; // Force redirect on 401
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login"; // Force redirect on 401
+        }
       }
     }
     return Promise.reject(error);

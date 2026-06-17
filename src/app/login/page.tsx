@@ -32,6 +32,7 @@ export default function LoginPage() {
       const response = await loginApi({ email, password });
       if (response.data?.status === "Success" && response.data?.token) {
         toast.success("Logged in successfully");
+        localStorage.setItem("token", response.data.token);
         dispatch(setCredentials({ user: response.data.data, token: response.data.token }));
         router.push("/staff"); // Or any other protected route
       } else {

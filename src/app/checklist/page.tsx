@@ -16,13 +16,14 @@ export default function ChecklistRecords() {
   const filtered = records.filter((r) => {
     const q = search.toLowerCase();
     return (
-      String(r.slipNo).includes(q) ||
-      (r.info.nameOf3PL || "").toLowerCase().includes(q) ||
-      (r.info.location || "").toLowerCase().includes(q)
+      (r._id || "").toLowerCase().includes(q) ||
+      (r.name_of_3pl || "").toLowerCase().includes(q) ||
+      (r.location || "").toLowerCase().includes(q)
     );
   });
 
   function formatDate(iso) {
+    if (!iso) return "—";
     const d = new Date(iso);
     const dd = String(d.getDate()).padStart(2, "0");
     const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -40,9 +41,8 @@ export default function ChecklistRecords() {
         <button
           onClick={() => router.push("/checklist/add")}
           className="gap-2 px-6 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 font-semibold text-white cursor-pointer transition-colors text-[13px] flex items-center justify-center flex-shrink-0"
-          title="Add new record"
         >
-         + Add
+          + Add
         </button>
       </div>
 
@@ -72,29 +72,29 @@ export default function ChecklistRecords() {
               </thead>
               <tbody>
                 {filtered.map((r, i) => (
-                  <tr key={r.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50/60"}>
+                  <tr key={r._id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50/60"}>
                     <td className="px-2 py-3 text-gray-400">{i + 1}</td>
-                    <td className="px-2 py-3 font-semibold text-blue-600">#{r.slipNo}</td>
+                    <td className="px-2 py-3 font-semibold text-blue-600">#{r._id?.slice(-5)}</td>
                     <td className="px-2 py-3">
-                      <p className="font-semibold text-gray-800">{r.info.nameOf3PL || "—"}</p>
-                      <p className="text-[10px] text-gray-400">{r.info.location || "—"}</p>
+                      <p className="font-semibold text-gray-800">{r.name_of_3pl || "—"}</p>
+                      <p className="text-[10px] text-gray-400">{r.location || "—"}</p>
                     </td>
-                    <td className="px-2 py-3 text-gray-600">{formatDate(r.savedAt)}</td>
+                    <td className="px-2 py-3 text-gray-600">{formatDate(r.createdAt)}</td>
                     <td className="px-2 py-3 text-center">
                       <span className="inline-block bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-md text-[11px]">
-                        {r.totalScore} / {r.maxScore}
+                        {r.total ?? "—"} / {r.data?.reduce((s, sec) => s + (sec.weight || 0), 0) ?? "—"}
                       </span>
                     </td>
                     <td className="px-2 py-3">
                       <div className="flex gap-1.5 justify-center">
                         <button
-                          onClick={() => router.push(`/checklist/view/${r.id}`)}
+                          onClick={() => router.push(`/checklist/view/${r._id}`)}
                           className="px-2 py-1 rounded-md text-[10px] font-semibold border bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 transition-colors"
                         >
                           👁 View
                         </button>
                         <button
-                          onClick={() => router.push(`/checklist/edit/${r.id}`)}
+                          onClick={() => router.push(`/checklist/edit/${r._id}`)}
                           className="px-2 py-1 rounded-md text-[10px] font-semibold border bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 transition-colors"
                         >
                           ✏️ Edit
