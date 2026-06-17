@@ -36,14 +36,24 @@ type UserInfo = {
   id: string;
   name?: string;
   email?: string;
+  role?: string;
+  [key: string]: any;
+};
+
+const ADMIN_ONLY_IDS = ["staff", "checklist", "settings"];
+
+const getVisibleNav = (role?: string) => {
+  if (role?.toLowerCase() === "admin") return PRIMARY_NAV;
+  return PRIMARY_NAV.filter((item) => !ADMIN_ONLY_IDS.includes(item.id));
 };
 
 const getTokenPayload = (): UserInfo | null => {
   try {
     const token = localStorage.getItem("token");
     if (!token) return null;
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload || null;
+    const tokenData = JSON.parse(atob(token.split(".")[1]));
+    const userData = JSON.parse(localStorage.getItem("user") || "null");
+    return { ...tokenData, ...userData };
   } catch {
     return null;
   }
@@ -64,12 +74,14 @@ export default function Sidebar() {
   const [creating, setCreating]                 = useState(false);
   const [createError, setCreateError]           = useState<string | null>(null);
   const [userInfo, setUserInfo]                 = useState<UserInfo | null>(null);
+  const [visibleNav, setVisibleNav]             = useState<typeof PRIMARY_NAV>(PRIMARY_NAV);
+  const [collapsed, setCollapsed]               = useState(false);
 
   useEffect(() => {
     const payload = getTokenPayload();
-    setUserInfo(payload);
-
     if (!payload?.id) return;
+    setUserInfo(payload);
+    setVisibleNav(getVisibleNav(payload?.role));
 
     let cancelled = false;
     setLoadingLists(true);
@@ -93,6 +105,7 @@ export default function Sidebar() {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("user");
     router.push("/login");
   };
 
@@ -141,39 +154,42 @@ export default function Sidebar() {
     setCheckedLists((p) => ({ ...p, [id]: !p[id] }));
 
   // User display info
-  const displayName  = userInfo?.name  || "User";
+  const displayName  = userInfo?.fullName || userInfo?.name || "User";
   const displayEmail = userInfo?.email || "";
   const firstLetter  = displayName.charAt(0).toUpperCase();
 
   if (pathname === "/login") return null;
 
   return (
-    <aside className="w-56 h-screen flex flex-col select-none shrink-0 bg-white border-r border-gray-100">
+    <aside className={`${collapsed ? "w-14" : "w-56"} h-screen flex flex-col select-none shrink-0 bg-white border-r border-gray-100 transition-all duration-200`}>
 
       {/* ── Header ── */}
-      <div className="px-4 pt-5 pb-4 flex items-center gap-3 border-b border-gray-100">
+      <div className={`px-3 pt-5 pb-4 flex border-b border-gray-100 ${collapsed ? "flex-col items-center gap-2" : "flex-row items-center gap-3"}`}>
         <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center shrink-0">
           <MessageSquare className="w-4 h-4 text-white" />
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-gray-900 font-bold text-[15px] leading-tight">Lotus</p>
-          <p className="text-gray-400 text-[11px] leading-tight">Reminder Suite</p>
-        </div>
-        <button className="text-gray-400 hover:text-gray-600 p-1">
-          <ChevronDown className="w-4 h-4 rotate-90" />
+        {!collapsed && (
+          <div className="flex-1 min-w-0">
+            <p className="text-gray-900 font-bold text-[15px] leading-tight">Lotus</p>
+            <p className="text-gray-400 text-[11px] leading-tight">Reminder Suite</p>
+          </div>
+        )}
+        <button onClick={() => setCollapsed(p => !p)} className="text-gray-400 hover:text-gray-600 p-1 shrink-0">
+          <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${collapsed ? "-rotate-90" : "rotate-90"}`} />
         </button>
       </div>
 
       {/* ── Nav ── */}
       <div className="flex-1 overflow-y-auto py-3">
         <nav className="px-3 space-y-0.5">
-          {PRIMARY_NAV.map((item) => {
+          {visibleNav.map((item) => {
             const Icon   = item.icon;
             const active = isActive(item.path);
             return (
               <button
                 key={item.id}
                 onClick={() => router.push(item.path)}
+                title={collapsed ? item.label : undefined}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
                   active
                     ? "bg-[#E7F8F1] text-[#00A884]"
@@ -181,7 +197,7 @@ export default function Sidebar() {
                 }`}
               >
                 <Icon className={`w-[17px] h-[17px] shrink-0 ${active ? "text-[#00A884]" : "text-gray-400"}`} />
-                <span>{item.label}</span>
+                {!collapsed && <span>{item.label}</span>}
               </button>
             );
           })}
@@ -191,16 +207,17 @@ export default function Sidebar() {
         <div className="px-3 mt-2">
           <button
             onClick={() => setListsOpen((p) => !p)}
+            title={collapsed ? "Lists" : undefined}
             className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-3">
               <CheckSquare className="w-[17px] h-[17px] text-gray-400" />
-              <span className="text-sm font-medium">Lists</span>
+              {!collapsed && <span className="text-sm font-medium">Lists</span>}
             </div>
-            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${listsOpen ? "rotate-180" : ""}`} />
+            {!collapsed && <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${listsOpen ? "rotate-180" : ""}`} />}
           </button>
 
-          {listsOpen && (
+          {listsOpen && !collapsed && (
             <div className="mt-0.5 ml-3 pl-3 border-l border-gray-100 space-y-0.5">
 
               {/* My Tasks */}
@@ -299,17 +316,20 @@ export default function Sidebar() {
           <div className="w-8 h-8 rounded-full bg-[#E7F8F1] flex items-center justify-center text-[#00A884] text-xs font-bold shrink-0">
             {firstLetter}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-gray-800 text-xs font-semibold truncate">{displayName}</p>
-            <p className="text-gray-400 text-[10px] truncate">{displayEmail}</p>
-          </div>
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <p className="text-gray-800 text-xs font-semibold truncate">{displayName}</p>
+              <p className="text-gray-400 text-[10px] truncate">{displayEmail}</p>
+            </div>
+          )}
         </div>
         <button
           onClick={handleLogout}
+          title={collapsed ? "Logout" : undefined}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
         >
           <LogOut className="w-[17px] h-[17px]" />
-          <span>Logout</span>
+          {!collapsed && <span>Logout</span>}
         </button>
       </div>
     </aside>

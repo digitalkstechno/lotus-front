@@ -218,7 +218,7 @@ export default function UnifiedMastersPage() {
     return (
         <div className="flex flex-col h-screen w-full overflow-hidden bg-slate-50 font-sans text-xs">
             <div className="bg-emerald-700 text-white px-6 py-4 shadow-md shrink-0 flex items-center gap-3">
-                <button onClick={() => router.back()} className="p-1.5 rounded-full hover:bg-white/20 transition-colors">
+                <button onClick={() => router.back()} className="p-1.5 rounded-full bg-white/20 transition-colors">
                     <ArrowLeft className="w-4 h-4" />
                 </button>
                 <div>

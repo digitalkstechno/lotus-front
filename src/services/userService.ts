@@ -17,3 +17,7 @@ export const updateUserApi = (id: string, data: any) => {
 export const deleteUserApi = (id: string) => {
   return axiosInstance.delete(`/user/${id}`);
 };
+
+export const getUserByIdApi = (id: string) => {
+  return axiosInstance.get(`/user/${id}`);
+};

@@ -33,8 +33,10 @@ export default function LoginPage() {
       if (response.data?.status === "Success" && response.data?.token) {
         toast.success("Logged in successfully");
         localStorage.setItem("token", response.data.token);
+        localStorage.setItem("user", JSON.stringify(response.data.data));
         dispatch(setCredentials({ user: response.data.data, token: response.data.token }));
-        router.push("/staff"); // Or any other protected route
+        const role = response.data.data?.role;
+        router.push(role?.toLowerCase() === "admin" ? "/staff" : "/task");
       } else {
         toast.error("Invalid credentials. Please try again.");
       }

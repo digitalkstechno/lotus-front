@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "../../redux/store";
 import { fetchUnits, addUnit, updateUnit, deleteUnit } from "../../redux/slices/unitSlice";
@@ -93,6 +94,17 @@ const INITIAL_STAFF: Staff[] = [
 ];
 
 export default function StaffPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    try {
+      const user = JSON.parse(localStorage.getItem("user") || "null");
+      if (user?.role?.toLowerCase() !== "admin") router.replace("/task");
+    } catch {
+      router.replace("/task");
+    }
+  }, []);
+
   const dispatch = useDispatch<AppDispatch>();
   const { units } = useSelector((state: RootState) => state.units);
   const { teams } = useSelector((state: RootState) => state.teams);
