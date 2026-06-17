@@ -6,6 +6,10 @@ export const getUsersPaginatedApi = (page: number, limit: number, search: string
   });
 };
 
+export const fetchUsersDropdownApi = () => {
+  return axiosInstance.get(`/user/dropdown`);
+};
+
 export const addUserApi = (data: any) => {
   return axiosInstance.post("/user/create", data);
 };

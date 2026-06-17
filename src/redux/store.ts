@@ -6,6 +6,9 @@ import userReducer from "./slices/userSlice";
 import master1Reducer from "./slices/master1Slice";
 import master2Reducer from "./slices/master2Slice";
 
+import listReducer from "./slices/listSlice";
+import taskUIReducer from "./slices/taskUISlice";
+
 export const store = configureStore({
   reducer: {
     auth: authReducer,
@@ -14,6 +17,8 @@ export const store = configureStore({
     users: userReducer,
     master1: master1Reducer,
     master2: master2Reducer,
+    lists: listReducer,
+    taskUI: taskUIReducer,
     // Add other reducers here as you build your app
   },
   devTools: process.env.NODE_ENV !== "production",
