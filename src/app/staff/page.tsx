@@ -109,6 +109,7 @@ export default function StaffPage() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null); // default entire org
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     dispatch(fetchUsersPaginated({
@@ -145,7 +146,7 @@ export default function StaffPage() {
   const [pickerForm, setPickerForm] = useState({ name: "", email: "", phone: "", designation: "" });
   const [unitForm, setUnitForm] = useState({ name: "", headId: "", headName: "" });
   const [teamForm, setTeamForm] = useState({ name: "", unitId: "", headId: "", headName: "" });
-  const [staffForm, setStaffForm] = useState({ name: "", email: "", phone: "", designation: "", unitId: "", teamId: "" });
+  const [staffForm, setStaffForm] = useState({ name: "", email: "", phone: "", designation: "", unitId: "", teamId: "", password: "" });
   const [confirmDialog, setConfirmDialog] = useState<{ title: string; message: string; onConfirm: () => void; } | null>(null);
 
   const staffMap = useMemo(() => { const m = new Map<string, Staff>(); staff.forEach(s => m.set(s.id, s)); return m; }, [staff]);
@@ -211,13 +212,32 @@ export default function StaffPage() {
     if (!staffForm.name.trim()) return;
     try {
       if (drawer.type === "add-staff") {
-        await dispatch(addUser({ name: staffForm.name, email: staffForm.email || `${staffForm.name.toLowerCase().replace(/\s+/g, ".")}@corp.acme.com`, phone: staffForm.phone || "+1 (555) 000-0000", designation: staffForm.designation || "Staff Specialist", unitId: staffForm.unitId || null, teamId: staffForm.teamId || null })).unwrap();
+        await dispatch(addUser({
+          name: staffForm.name,
+          email: staffForm.email || `${staffForm.name.toLowerCase().replace(/\s+/g, ".")}@corp.acme.com`,
+          phone: staffForm.phone || "+1 (555) 000-0000",
+          designation: staffForm.designation || "Staff Specialist",
+          unitId: staffForm.unitId || null,
+          teamId: staffForm.teamId || null,
+          password: staffForm.password,
+        })).unwrap();
         if (staffForm.designation === "unit_head") dispatch(fetchUnits());
         if (staffForm.designation === "team_head") dispatch(fetchTeams());
         dispatch(fetchUsersPaginated({ page: currentPage, limit: 10, search: searchQuery, unitId: selectedUnitId, teamId: selectedTeamId }));
         showToast(`Staff profile for "${staffForm.name}" added successfully.`);
       } else if (drawer.type === "edit-staff" && drawer.targetId) {
-        await dispatch(updateUser({ id: drawer.targetId, data: { name: staffForm.name, email: staffForm.email, phone: staffForm.phone, designation: staffForm.designation, unitId: staffForm.unitId || null, teamId: staffForm.teamId || null } })).unwrap();
+        const updateData: any = {
+          name: staffForm.name,
+          email: staffForm.email,
+          phone: staffForm.phone,
+          designation: staffForm.designation,
+          unitId: staffForm.unitId || null,
+          teamId: staffForm.teamId || null,
+        };
+        if (staffForm.password.trim()) {
+          updateData.password = staffForm.password;
+        }
+        await dispatch(updateUser({ id: drawer.targetId, data: updateData })).unwrap();
         if (staffForm.designation === "unit_head") dispatch(fetchUnits());
         if (staffForm.designation === "team_head") dispatch(fetchTeams());
         dispatch(fetchUsersPaginated({ page: currentPage, limit: 10, search: searchQuery, unitId: selectedUnitId, teamId: selectedTeamId }));
@@ -326,7 +346,15 @@ export default function StaffPage() {
   const triggerAddTeam = (prefillUnitId?: string) => { setTeamForm({ name: "", unitId: prefillUnitId || units[0]?.id || "", headId: "", headName: "" }); setDrawer({ type: "add-team", title: "Establish New Squad Team" }); };
   const triggerEditTeam = (team: Team) => { setTeamForm({ name: team.name, unitId: team.unitId, headId: team.headId || "", headName: (team as any).headName || "" }); setDrawer({ type: "edit-team", title: `Modify ${team.name} Squad`, targetId: team.id }); };
   const triggerAddStaff = (prefillUnitId?: string | null, prefillTeamId?: string | null, prefillRole?: string | null) => { setStaffForm({ name: "", email: "", phone: "", designation: prefillRole || "staff", unitId: prefillUnitId || "", teamId: prefillTeamId || "" }); setDrawer({ type: "add-staff", title: "Add New Staff Member" }); };
-  const triggerEditStaff = (personnel: Staff) => { setStaffForm({ name: personnel.name, email: personnel.email, phone: personnel.phone, designation: personnel.designation, unitId: personnel.unitId || "", teamId: personnel.teamId || "" }); setDrawer({ type: "edit-staff", title: `Edit ${personnel.name}'s Profile`, targetId: personnel.id }); };
+  const triggerEditStaff = (personnel: Staff) => {
+    setStaffForm({
+      name: personnel.name, email: personnel.email,
+      phone: personnel.phone, designation: personnel.designation,
+      unitId: personnel.unitId || "", teamId: personnel.teamId || "",
+      password: ""
+    });
+    setDrawer({ type: "edit-staff", title: `Edit ${personnel.name}'s Profile`, targetId: personnel.id });
+  };
   const triggerTransferStaff = (personnel: Staff) => { setDrawer({ type: "transfer-staff", title: `Transfer ${personnel.name}`, targetId: personnel.id, payload: { unitId: personnel.unitId || "", teamId: personnel.teamId || "" } }); };
   const triggerPromoteToTeam = (personnel: Staff) => { setDrawer({ type: "promote-team", title: `Promote ${personnel.name} to Team Lead`, targetId: personnel.id, payload: { selectedTeamId: personnel.teamId || teams[0]?.id || "" } }); };
   const triggerUserPicker = async (currentSelectionId: string | null, roleFilter: string | null, onSelect: (staffId: string, staffName?: string) => void, contextUnitId?: string | null, contextTeamId?: string | null) => {
@@ -757,12 +785,42 @@ export default function StaffPage() {
                               </select>
                             </div>
                             <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">Phone</label>
+                              <input type="text" placeholder="1234567890" maxLength={10} value={staffForm.phone || ""} onChange={(e) => setStaffForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))} className="w-full bg-gray-100 text-slate-800 placeholder-slate-400 border-0 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                            </div>
+                            <div className="space-y-1">
                               <label className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">Email</label>
                               <input type="email" placeholder="name@acme.com" value={staffForm.email} onChange={(e) => setStaffForm(p => ({ ...p, email: e.target.value }))} className="w-full bg-gray-100 text-slate-800 placeholder-slate-400 border-0 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
                             </div>
                             <div className="space-y-1">
-                              <label className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">Phone</label>
-                              <input type="text" placeholder="1234567890" maxLength={10} value={staffForm.phone || ""} onChange={(e) => setStaffForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))} className="w-full bg-gray-100 text-slate-800 placeholder-slate-400 border-0 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                              <label className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">
+                                Password {drawer.type === "add-staff" ? "*" : "(blank = no change)"}
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type={showPassword ? "text" : "password"}
+                                  placeholder={drawer.type === "add-staff" ? "Enter password" : "Enter new password"}
+                                  required={drawer.type === "add-staff"}
+                                  value={staffForm.password}
+                                  onChange={(e) => setStaffForm(p => ({ ...p, password: e.target.value }))}
+                                  className="w-full bg-gray-100 text-slate-800 placeholder-slate-400 border-0 rounded-lg px-3 py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                                />
+                                <button type="button" onClick={() => setShowPassword(p => !p)}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                  {showPassword ? (
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                                      <line x1="1" y1="1" x2="23" y2="23" />
+                                    </svg>
+                                  ) : (
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                      <circle cx="12" cy="12" r="3" />
+                                    </svg>
+                                  )}
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
