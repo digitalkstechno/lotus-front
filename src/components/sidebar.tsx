@@ -16,7 +16,7 @@ import {
   X,
   Loader2,
 } from "lucide-react";
-import { getListsByUserApi, createListApi } from "../services/listService";
+import { getListsByUserApi, createListApi, updateListApi } from "../services/listService";
 
 const PRIMARY_NAV = [
   { id: "task",      label: "Task",       icon: ClipboardList, path: "/task" },
@@ -73,11 +73,16 @@ export default function Sidebar() {
 
     let cancelled = false;
     setLoadingLists(true);
-    getListsByUserApi(payload.id)
+    getListsByUserApi(payload.id, 1, 100)
       .then((res) => {
         if (!cancelled) {
           const lists = res.data.data || [];
           setUserLists(lists);
+          const initialChecks: Record<string, boolean> = {};
+          lists.forEach((l: any) => {
+            initialChecks[l._id] = l.isChecked !== false; // Default to true if missing
+          });
+          setCheckedLists(initialChecks);
         }
       })
       .catch((err) => {
@@ -137,8 +142,21 @@ export default function Sidebar() {
       ? pathname.startsWith("/checklist")
       : pathname === path;
 
-  const toggleListChecked = (id: string) =>
-    setCheckedLists((p) => ({ ...p, [id]: !p[id] }));
+  const toggleListChecked = async (id: string) => {
+    const isCurrentlyChecked = !!checkedLists[id];
+    const newCheckedState = !isCurrentlyChecked;
+    setCheckedLists((p) => ({ ...p, [id]: newCheckedState }));
+    
+    if (id === "my-tasks") return; // Bypass backend call for the virtual "My Tasks" list
+
+    try {
+      await updateListApi(id, { isChecked: newCheckedState });
+    } catch (err) {
+      console.error("Failed to update isChecked for list", err);
+      // Revert on failure
+      setCheckedLists((p) => ({ ...p, [id]: isCurrentlyChecked }));
+    }
+  };
 
   // User display info
   const displayName  = userInfo?.name  || "User";
@@ -165,7 +183,7 @@ export default function Sidebar() {
       </div>
 
       {/* ── Nav ── */}
-      <div className="flex-1 overflow-y-auto py-3">
+      <div className="py-3 shrink-0">
         <nav className="px-3 space-y-0.5">
           {PRIMARY_NAV.map((item) => {
             const Icon   = item.icon;
@@ -186,12 +204,13 @@ export default function Sidebar() {
             );
           })}
         </nav>
+      </div>
 
-        {/* ── Lists section ── */}
-        <div className="px-3 mt-2">
-          <button
+      {/* ── Lists section ── */}
+      <div className="flex-1 flex flex-col px-3 mt-2 min-h-0">
+        <button
             onClick={() => setListsOpen((p) => !p)}
-            className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors cursor-pointer"
+            className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors cursor-pointer shrink-0"
           >
             <div className="flex items-center gap-3">
               <CheckSquare className="w-[17px] h-[17px] text-gray-400" />
@@ -201,26 +220,7 @@ export default function Sidebar() {
           </button>
 
           {listsOpen && (
-            <div className="mt-0.5 ml-3 pl-3 border-l border-gray-100 space-y-0.5">
-
-              {/* My Tasks */}
-              <button
-                onClick={() => router.push("/task")}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
-                  pathname === "/task" && !activeListId
-                    ? "text-[#00A884] bg-[#E7F8F1]"
-                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={!!checkedLists["my-tasks"]}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={() => toggleListChecked("my-tasks")}
-                  className="w-3.5 h-3.5 rounded border-gray-300 text-[#00A884] focus:ring-[#00A884] cursor-pointer shrink-0"
-                />
-                <span className="truncate">My Tasks</span>
-              </button>
+            <div className="mt-0.5 ml-3 pl-3 border-l border-gray-100 space-y-0.5 flex-1 overflow-y-auto">
 
               {/* User na lists */}
               {loadingLists ? (
@@ -291,7 +291,6 @@ export default function Sidebar() {
             </div>
           )}
         </div>
-      </div>
 
       {/* ── Footer ── */}
       <div className="px-3 py-3 border-t border-gray-100 space-y-0.5">

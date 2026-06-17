@@ -31,7 +31,7 @@ function AppContent() {
   useEffect(() => {
     if (userId) {
       dispatch(resetLists());
-      dispatch(fetchListsByUser({ userId, page: 1, limit: 5 }) as any);
+      dispatch(fetchListsByUser({ userId, page: 1, limit: 10, isChecked: true }) as any);
     }
   }, [userId, dispatch]);
 

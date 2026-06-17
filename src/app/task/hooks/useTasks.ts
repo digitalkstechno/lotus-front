@@ -3,7 +3,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { uid, newTask } from "../lib/utils";
 import { useOrgPeople } from "../hooks/useOrgPeople";
-import { fetchListsByUser, setListsLocally, fetchTasksForList } from "../../../redux/slices/listSlice";
+import { fetchListsByUser, setListsLocally, fetchTasksForList, updateList as updateListThunk } from "../../../redux/slices/listSlice";
 import * as uiActions from "../../../redux/slices/taskUISlice";
 import { store } from "../../../redux/store";
 import axiosInstance from "../../../utils/axios";
@@ -73,11 +73,15 @@ export const useTasks = () => {
   const dragDataRef = useRef<any>(null);
 
   const fetchLists = useCallback((pageToFetch: number) => {
-    if (userId) dispatch(fetchListsByUser({ userId, page: pageToFetch, limit: 5 }) as any);
+    if (userId) dispatch(fetchListsByUser({ userId, page: pageToFetch, limit: 10, isChecked: true }) as any);
   }, [userId, dispatch]);
 
   const fetchTasksForCurrentList = useCallback((listId: string, pageToFetch: number) => {
-    if (userId) dispatch(fetchTasksForList({ listId, userId, page: pageToFetch, limit: 20 }) as any);
+    if (userId) {
+      const targetList = store.getState().lists.lists.find((l: any) => l.id === listId);
+      const sortBy = targetList ? targetList.sortBy : undefined;
+      dispatch(fetchTasksForList({ listId, userId, page: pageToFetch, limit: 20, sortBy }) as any);
+    }
   }, [userId, dispatch]);
 
   const loadMoreLists = useCallback(() => {
@@ -550,6 +554,7 @@ export const useTasks = () => {
 
   const setSortBy = (listId: string, value: string) => {
     updateList(listId, (l) => ({ ...l, sortBy: value }));
+    dispatch(updateListThunk({ id: listId, data: { sortBy: value } }) as any);
     setOpenListMenu(null);
   };
 
@@ -561,7 +566,10 @@ export const useTasks = () => {
   const commitRename = (listId: string) => {
     const currentUI = store.getState().taskUI;
     const name = currentUI.renameValue.trim();
-    if (name) updateList(listId, (l) => ({ ...l, name }));
+    if (name) {
+      updateList(listId, (l) => ({ ...l, name }));
+      dispatch(updateListThunk({ id: listId, data: { name } }) as any);
+    }
     setRenamingListId(null);
   };
 
@@ -586,7 +594,7 @@ export const useTasks = () => {
     const currentUI = store.getState().taskUI;
     const name = currentUI.newListName.trim();
     if (!name) return;
-    setLists((prev: any) => [...prev, { id: uid(), name, sortBy: "deadline", tasks: [] }]);
+    setLists((prev: any) => [...prev, { id: uid(), name, sortBy: "my-order", tasks: [] }]);
     setNewListName("");
     setAddingList(false);
   };

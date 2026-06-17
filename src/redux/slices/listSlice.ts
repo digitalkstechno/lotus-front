@@ -5,9 +5,9 @@ import { getTasksByListAndUserApi } from "../../services/taskService";
 // Fetch user na lists
 export const fetchListsByUser = createAsyncThunk(
   "lists/fetchByUser",
-  async ({ userId, page = 1, limit = 10 }: { userId: string, page?: number, limit?: number }, { rejectWithValue }) => {
+  async ({ userId, page = 1, limit = 10, isChecked }: { userId: string, page?: number, limit?: number, isChecked?: boolean }, { rejectWithValue }) => {
     try {
-      const response = await listApi.getListsByUserApi(userId, page, limit);
+      const response = await listApi.getListsByUserApi(userId, page, limit, isChecked);
       // The backend returns: { status: "Success", pagination: {...}, data: [...] }
       const resData = response.data;
       let fetchedData = [];
@@ -74,9 +74,9 @@ export const deleteList = createAsyncThunk(
 // Fetch tasks for a specific list
 export const fetchTasksForList = createAsyncThunk(
   "lists/fetchTasks",
-  async ({ listId, userId, page = 1, limit = 20 }: { listId: string, userId: string, page?: number, limit?: number }, { rejectWithValue }) => {
+  async ({ listId, userId, page = 1, limit = 20, sortBy }: { listId: string, userId: string, page?: number, limit?: number, sortBy?: string }, { rejectWithValue }) => {
     try {
-      const response = await getTasksByListAndUserApi(listId, userId, page, limit);
+      const response = await getTasksByListAndUserApi(listId, userId, page, limit, sortBy);
       const resData = response.data;
       let fetchedTasks: any[] = [];
       let pagination = { totalPages: 1, currentPage: page };

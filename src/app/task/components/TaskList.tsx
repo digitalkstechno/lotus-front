@@ -56,10 +56,10 @@ export const TaskList = ({ list }: any) => {
       return [{ label: null, tasks: [...active].sort((a: any, b: any) => a.title.localeCompare(b.title)) }];
     }
     if (list.sortBy === "date") {
-      return [{ label: null, tasks: [...active].sort((a: any, b: any) => a.createdAt - b.createdAt) }];
+      return [{ label: null, tasks: [...active].sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) }];
     }
     if (list.sortBy === "starred") {
-      return [{ label: null, tasks: [...active].sort((a: any, b: any) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0)) }];
+      return [{ label: null, tasks: [...active].sort((a: any, b: any) => (b.isStarred ? 1 : 0) - (a.isStarred ? 1 : 0)) }];
     }
     if (list.sortBy === "my-order") {
       return [{ label: null, tasks: active }];

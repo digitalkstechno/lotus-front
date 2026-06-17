@@ -6,6 +6,7 @@ export interface ListItem {
   order?: number;
   user_id?: string | null;
   is_active?: boolean;
+  isChecked?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -20,6 +21,8 @@ export interface UpdateListPayload {
   name?: string;
   order?: number;
   is_active?: boolean;
+  isChecked?: boolean;
+  sortBy?: string;
 }
 
 // POST /list/create
@@ -38,8 +41,10 @@ export const getListByIdApi = (id: string) => {
 };
 
 // GET /list/user/:user_id  → paginated lists belonging to one user
-export const getListsByUserApi = (user_id: string, page = 1, limit = 10) => {
-  return axiosInstance.get(`/list/user/${user_id}`, { params: { page, limit } });
+export const getListsByUserApi = (user_id: string, page = 1, limit = 10, isChecked?: boolean) => {
+  const params: any = { page, limit };
+  if (isChecked !== undefined) params.isChecked = isChecked;
+  return axiosInstance.get(`/list/user/${user_id}`, { params });
 };
 
 // PUT /list/:id
