@@ -27,7 +27,7 @@ export function ChecklistProvider({ children }) {
 
   async function getRecord(id) {
     try {
-      if(!localStorage.getItem("token")){
+      if(typeof window !== "undefined" && localStorage.getItem("token")){
         const res = await axiosInstance.get(`/checklist/${id}`);
         return res.data?.data || res.data;
       }
@@ -39,7 +39,7 @@ export function ChecklistProvider({ children }) {
 
   async function updateRecord(id, body) {
     try {
-      if(!localStorage.getItem("token")){
+      if(typeof window !== "undefined" && localStorage.getItem("token")){
         const res = await updateChecklistApi(id, body);
         await fetchRecordsList(); // list refresh
         return { success: true, data: res.data?.data || res.data };
@@ -54,7 +54,7 @@ export function ChecklistProvider({ children }) {
   useEffect(() => {
     async function fetchMaster2() {
       try {
-        if(!localStorage.getItem("token")){
+        if(typeof window !== "undefined" && localStorage.getItem("token")){
 
           const res = await axiosInstance.get("/master2");
           const data = res.data?.data || [];
@@ -98,7 +98,7 @@ export function ChecklistProvider({ children }) {
   async function fetchRecordsList(page = 1, limit = 10) {
     setFetchingRecords(true);
     try {
-      if(!localStorage.getItem("token")){
+      if(typeof window !== "undefined" && localStorage.getItem("token")){
         const res = await getChecklistsApi(page, limit);
         const data = res.data?.data || [];
         setRecords(data);
