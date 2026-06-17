@@ -8,6 +8,7 @@ import * as uiActions from "../../../redux/slices/taskUISlice";
 import { store } from "../../../redux/store";
 import axiosInstance from "../../../utils/axios";
 import { setCredentials } from "../../../redux/slices/authSlice";
+import { createTaskApi, updateTaskApi, uploadTaskFilesApi, removeTaskAttachmentApi, deleteTaskApi } from "../../../services/taskService";
 
 export const useTasks = () => {
   const dispatch = useDispatch();
@@ -17,14 +18,14 @@ export const useTasks = () => {
 
   // Redux Selectors
   const authUser = useSelector((state: any) => state.auth.user);
-  
+
   // Try to get userId from Redux, fallback to token
   let userId = authUser?._id;
   if (!userId && typeof window !== "undefined") {
     try {
       const token = localStorage.getItem("token");
       if (token) userId = JSON.parse(atob(token.split(".")[1]))?.id;
-    } catch (e) {}
+    } catch (e) { }
   }
 
   const { lists, loading: loadingLists, hasMore, currentPage: page } = useSelector((state: any) => state.lists);
@@ -89,10 +90,10 @@ export const useTasks = () => {
   useEffect(() => {
     if (!authUser && userId) {
       axiosInstance.get(`/user/${userId}`).then(res => {
-         const fetchedUser = res.data?.data;
-         if (fetchedUser) {
-           dispatch(setCredentials({ user: fetchedUser, token: localStorage.getItem("token") || "" }));
-         }
+        const fetchedUser = res.data?.data;
+        if (fetchedUser) {
+          dispatch(setCredentials({ user: fetchedUser, token: localStorage.getItem("token") || "" }));
+        }
       }).catch(console.error);
     }
   }, [authUser, userId, dispatch]);
@@ -158,6 +159,15 @@ export const useTasks = () => {
       };
     });
 
+  const syncToBackend = (taskId: string, payload: any) => {
+    if (taskId.length < 24) return; // Skip temporary frontend-generated IDs
+    const currentLists = store.getState().lists.lists;
+    const found = findTaskEverywhere(taskId, currentLists);
+    if (found && !(found.task as any).isNew) {
+      updateTaskApi(taskId, payload).catch(console.error);
+    }
+  };
+
   // --- Actions ---
   const toggleComplete = (taskId: string) => {
     const currentLists = store.getState().lists.lists;
@@ -186,30 +196,241 @@ export const useTasks = () => {
         return;
       }
     }
+    syncToBackend(taskId, { status: !wasCompleted ? "Completed" : "Pending" });
     updateTaskEverywhere(taskId, (t) => ({ ...t, completed: !t.completed }));
   };
 
-  const toggleStar = (taskId: string) => updateTaskEverywhere(taskId, (t) => ({ ...t, starred: !t.starred }));
+  const toggleStar = (taskId: string) => updateTaskEverywhere(taskId, (t) => {
+    const newVal = !t.starred;
+    syncToBackend(taskId, { isStarred: newVal });
+    return { ...t, starred: newVal };
+  });
   const setTitle = (taskId: string, title: string) => updateTaskEverywhere(taskId, (t) => ({ ...t, title }));
   const setDetails = (taskId: string, details: string) => updateTaskEverywhere(taskId, (t) => ({ ...t, details }));
-  const setDue = (taskId: string, value: string | null) => updateTaskEverywhere(taskId, (t) => ({ ...t, due: value }));
+  const setDate = (taskId: string, value: string | null) => updateTaskEverywhere(taskId, (t) => {
+    let dateStr = null;
+    if (value === "today") dateStr = new Date().toISOString();
+    else if (value === "tomorrow") {
+      const d = new Date(); d.setDate(d.getDate() + 1); dateStr = d.toISOString();
+    }
+    syncToBackend(taskId, { date: dateStr });
+    return { ...t, date: value };
+  });
   const setDueDate = (taskId: string, dateStr: string | null) => {
-    updateTaskEverywhere(taskId, (t) => ({ ...t, dueDate: dateStr }));
+    updateTaskEverywhere(taskId, (t) => {
+      let finalDate = dateStr;
+      if (dateStr && t.dueTime) {
+        const [h, m] = t.dueTime.split(':');
+        const d = new Date(dateStr);
+        d.setHours(Number(h), Number(m), 0, 0);
+        finalDate = d.toISOString();
+      }
+      syncToBackend(taskId, { deadline: finalDate });
+      return { ...t, dueDate: finalDate };
+    });
     dispatch(uiActions.resetTomorrowClick(taskId));
   };
-  const setDueTime = (taskId: string, time: string | null) => updateTaskEverywhere(taskId, (t) => ({ ...t, dueTime: time }));
-  const setRepeat = (taskId: string, repeat: any) => updateTaskEverywhere(taskId, (t) => ({ ...t, repeat }));
-  const clearDue = (taskId: string) => updateTaskEverywhere(taskId, (t) => ({ ...t, due: null, dueDate: null, dueTime: null, repeat: null }));
-  const setAssign = (taskId: string, assign: any) => updateTaskEverywhere(taskId, (t) => ({ ...t, assign }));
-  const deleteTaskById = (taskId: string) => removeTaskEverywhere(taskId);
+  const setDueDateAndTime = (taskId: string, dateStr: string, timeStr: string | null | undefined) => {
+    updateTaskEverywhere(taskId, (t) => {
+      let finalDate = dateStr;
+      const timeToUse = timeStr !== undefined ? timeStr : t.dueTime;
+      if (dateStr && timeToUse) {
+        const [h, m] = timeToUse.split(':');
+        const d = new Date(dateStr);
+        d.setHours(Number(h), Number(m), 0, 0);
+        finalDate = d.toISOString();
+      }
+      syncToBackend(taskId, { deadline: finalDate, isTime: !!timeToUse });
+      return { ...t, dueDate: finalDate, dueTime: timeToUse };
+    });
+    dispatch(uiActions.resetTomorrowClick(taskId));
+  };
+  const setDueTime = (taskId: string, time: string | null) => updateTaskEverywhere(taskId, (t) => {
+    let finalDate = t.dueDate || new Date().toISOString();
+    if (time) {
+      const [h, m] = time.split(':');
+      const d = new Date(finalDate);
+      d.setHours(Number(h), Number(m), 0, 0);
+      finalDate = d.toISOString();
+    }
+    syncToBackend(taskId, { isTime: !!time, deadline: finalDate });
+    return { ...t, dueTime: time, dueDate: finalDate };
+  });
+  const setRepeat = (taskId: string, repeat: any) => updateTaskEverywhere(taskId, (t) => {
+    syncToBackend(taskId, { repeat });
+    return { ...t, repeat };
+  });
+  const clearDue = (taskId: string) => updateTaskEverywhere(taskId, (t) => {
+    syncToBackend(taskId, { deadline: null });
+    return { ...t, dueDate: null, dueTime: null };
+  });
+  const setAssign = (taskId: string, assign: any) => updateTaskEverywhere(taskId, (t) => {
+    syncToBackend(taskId, { assigned_to_user: assign?.id || null });
+    return { ...t, assign };
+  });
+  const deleteTaskById = async (taskId: string) => {
+    if (taskId.length >= 24) {
+      try {
+        await deleteTaskApi(taskId);
+      } catch (err) {
+        console.error("Failed to delete task", err);
+      }
+    }
+    
+    setLists((prev: any) => {
+      const found = findTaskEverywhere(taskId, prev);
+      if (!found) return prev;
+      return prev.map((l: any) => {
+        if (l.id !== found.listId) return l;
+        if (!found.parentId) {
+          // Deleting a main task
+          const taskIndex = l.tasks.findIndex((t: any) => t.id === taskId);
+          if (taskIndex === -1) return l;
+          const subtasksToPromote = found.task.subtasks || [];
+          const newTasks = [...l.tasks];
+          newTasks.splice(taskIndex, 1, ...subtasksToPromote);
+          return { ...l, tasks: newTasks };
+        } else {
+          // Deleting a subtask
+          return {
+            ...l,
+            tasks: l.tasks.map((t: any) => 
+              t.id === found.parentId 
+                ? { ...t, subtasks: t.subtasks.filter((s: any) => s.id !== taskId) }
+                : t
+            )
+          };
+        }
+      });
+    });
+  };
 
-  const closeEditing = () => {
+  const closeEditing = async () => {
     const currentLists = store.getState().lists.lists;
     if (editingTaskId) {
       const found = findTaskEverywhere(editingTaskId, currentLists);
-      if (found && !found.task.title.trim()) deleteTaskById(editingTaskId);
+      if (found) {
+        if (!found.task.title.trim()) {
+          deleteTaskById(editingTaskId);
+        } else if ((found.task as any).isNew && authUser) {
+          // Payload for backend (new task)
+          const payload = {
+            title: found.task.title,
+            description: found.task.details || "",
+            date: found.task.dueDate || new Date().toISOString(),
+            assigned_to_user: found.task.assign?.id || null,
+            list: found.listId,
+            parent_id: found.parentId || null,
+            assigned_by: authUser._id || authUser.id,
+            isStarred: found.task.starred || false,
+            repeat: found.task.repeat || { enabled: false },
+            order: found.task.order || 0
+          };
+
+          // Optimistically remove isNew flag
+          updateTaskEverywhere(editingTaskId, (t) => ({ ...t, isNew: false }));
+
+          try {
+            const res = await createTaskApi(payload);
+            const createdTask = res.data;
+            if (createdTask && createdTask._id) {
+              // Replace temporary ID with MongoDB ID
+              updateTaskEverywhere(editingTaskId, (t) => ({ ...t, id: createdTask._id, _id: createdTask._id }));
+            }
+          } catch (err) {
+            console.error("Failed to create task", err);
+          }
+        } else {
+          // For existing tasks, send title and details update on close
+          if (editingTaskId.length < 24) {
+            dispatch(uiActions.closeAllEditing());
+            return;
+          }
+          try {
+            await updateTaskApi(editingTaskId, {
+              title: found.task.title,
+              description: found.task.details || ""
+            });
+          } catch (err) {
+            console.error("Failed to update task text", err);
+          }
+        }
+      }
     }
     dispatch(uiActions.closeAllEditing());
+  };
+
+  const uploadTaskAttachment = async (taskId: string, file: File, tempId: string) => {
+    let finalTaskId = taskId;
+    if (taskId.length < 24) {
+      const currentLists = store.getState().lists.lists;
+      const found = findTaskEverywhere(taskId, currentLists);
+      if (found && (found.task as any).isNew && authUser) {
+        const payload = {
+          title: found.task.title || "New Task",
+          description: found.task.details || "",
+          date: found.task.dueDate || new Date().toISOString(),
+          assigned_to_user: found.task.assign?.id || null,
+          list: found.listId,
+          parent_id: found.parentId || null,
+          assigned_by: authUser._id || authUser.id,
+          isStarred: found.task.starred || false,
+          repeat: found.task.repeat || { enabled: false },
+          order: found.task.order || 0
+        };
+        try {
+          const res = await createTaskApi(payload);
+          const createdTask = res.data;
+          if (createdTask && createdTask._id) {
+            finalTaskId = createdTask._id;
+            updateTaskEverywhere(taskId, (t: any) => ({ ...t, id: createdTask._id, _id: createdTask._id, isNew: false }));
+          } else {
+            throw new Error("Failed to create task before uploading");
+          }
+        } catch (err) {
+          console.error("Failed to auto-save task", err);
+          updateTaskEverywhere(taskId, (t: any) => ({ ...t, attachments: (t.attachments || []).filter((a: any) => a.id !== tempId) }));
+          return;
+        }
+      } else {
+        // Not a new task or missing authUser, just cancel
+        updateTaskEverywhere(taskId, (t: any) => ({ ...t, attachments: (t.attachments || []).filter((a: any) => a.id !== tempId) }));
+        return;
+      }
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("files", file);
+      const res = await uploadTaskFilesApi(finalTaskId, formData);
+      const updatedTask = res.data?.data;
+      if (updatedTask && updatedTask.file) {
+        const attachments = updatedTask.file.map((f: string, idx: number) => ({
+          id: `att-${updatedTask._id || updatedTask.id}-${idx}`,
+          name: f.split('/').pop() || f,
+          url: `${process.env.NEXT_PUBLIC_IMAGE_URL || "http://localhost:5000"}/${f}`,
+          type: "unknown",
+          rawPath: f
+        }));
+        // Update everywhere using finalTaskId (since we replaced it in state)
+        updateTaskEverywhere(finalTaskId, (t: any) => ({ ...t, attachments }));
+      }
+    } catch (err) {
+      console.error("Failed to upload attachment", err);
+      // Remove optimistic update
+      updateTaskEverywhere(finalTaskId, (t: any) => ({ ...t, attachments: (t.attachments || []).filter((a: any) => a.id !== tempId) }));
+    }
+  };
+
+  const removeTaskAttachment = async (taskId: string, att: any) => {
+    // Optimistic remove
+    updateTaskEverywhere(taskId, (t: any) => ({ ...t, attachments: (t.attachments || []).filter((a: any) => a.id !== att.id) }));
+    if (!att.rawPath) return; // Cannot delete from backend if it doesn't have rawPath
+    try {
+      await removeTaskAttachmentApi(taskId, att.rawPath);
+    } catch (err) {
+      console.error("Failed to remove attachment", err);
+    }
   };
 
   const addTaskToList = (listId: string) => {
@@ -217,6 +438,15 @@ export const useTasks = () => {
     const title = "New Task";
     const t = newTask(title);
     t.listId = listId;
+    (t as any).isNew = true;
+
+    let maxOrder = -1;
+    const currentLists = store.getState().lists.lists;
+    const targetList = currentLists.find((l: any) => l.id === listId);
+    if (targetList && targetList.tasks.length > 0) {
+      maxOrder = Math.max(...targetList.tasks.map((task: any) => task.order || 0));
+    }
+    t.order = maxOrder + 1;
 
     if (authUser) {
       const uRole = authUser.role ? authUser.role.toLowerCase() : "";
@@ -233,12 +463,42 @@ export const useTasks = () => {
     setEditDeadlineFor(null);
   };
 
-  const addSubtask = (parentId: string) => {
+  const addSubtask = async (parentId: string) => {
     const currentUI = store.getState().taskUI;
     const title = (currentUI.newSubtaskInputs[parentId] || "").trim();
     if (!title) return;
-    updateTaskEverywhere(parentId, (t) => ({ ...t, subtasks: [...(t.subtasks || []), newTask(title)] }));
+
+    const currentLists = store.getState().lists.lists;
+    const parentFound = findTaskEverywhere(parentId, currentLists);
+    if (!parentFound) return;
+
+    // Optimistic UI update
+    const tempSubtask = newTask(title);
+    updateTaskEverywhere(parentId, (t) => ({ ...t, subtasks: [...(t.subtasks || []), tempSubtask] }));
     dispatch(uiActions.setNewSubtaskInput({ parentId, value: "" }));
+
+    // Backend creation
+    try {
+      const payload = {
+        title,
+        list: parentFound.listId,
+        parent_id: parentId,
+        assigned_to_user: authUser?._id || authUser?.id || null
+      };
+      const response = await createTaskApi(payload);
+      const createdSubtask = response.data?.data || response.data;
+
+      if (createdSubtask && createdSubtask._id) {
+        updateTaskEverywhere(parentId, (t) => {
+          const newSubtasks = t.subtasks.map((s: any) =>
+            s.id === tempSubtask.id ? { ...s, id: createdSubtask._id, _id: createdSubtask._id } : s
+          );
+          return { ...t, subtasks: newSubtasks };
+        });
+      }
+    } catch (err) {
+      console.error("Failed to create subtask", err);
+    }
   };
 
   const moveTaskToList = (taskId: string, parentId: string | null, targetListId: string) => {
@@ -253,6 +513,11 @@ export const useTasks = () => {
     });
     setOpenTaskMenu(null);
     setOpenMovePicker(null);
+    
+    // Sync backend: set new list_id, remove parent_id (since it moves to root of new list), update order
+    const targetList = store.getState().lists.lists.find((l: any) => l.id === targetListId);
+    const newOrder = targetList ? targetList.tasks.length : 0;
+    syncToBackend(taskId, { list: targetListId, parent_id: null, order: newOrder });
   };
 
   const moveTaskToNewList = (taskId: string, parentId: string | null, newListNameVal: string) => {
@@ -264,7 +529,7 @@ export const useTasks = () => {
   const handleTomorrowClick = (taskId: string, currentTask: any) => {
     const count = store.getState().taskUI.tomorrowClickCount[taskId] || 0;
     if (count === 0) {
-      setDue(taskId, "tomorrow");
+      setDate(taskId, "tomorrow");
       dispatch(uiActions.incrementTomorrowClick(taskId));
     } else {
       setCalendarFor(taskId);
@@ -273,10 +538,10 @@ export const useTasks = () => {
   };
 
   const handleTodayClick = (taskId: string, currentTask: any) => {
-    if (currentTask.due === "today") {
-      setDue(taskId, null);
+    if (currentTask.date === "today") {
+      setDate(taskId, null);
     } else {
-      setDue(taskId, "today");
+      setDate(taskId, "today");
       dispatch(uiActions.resetTomorrowClick(taskId));
     }
   };
@@ -364,6 +629,9 @@ export const useTasks = () => {
       return next;
     });
     dragDataRef.current = null;
+    const targetList = store.getState().lists.lists.find((l: any) => l.id === listId);
+    const newOrder = targetList ? targetList.tasks.length : 0;
+    syncToBackend(d.taskId, { list_id: listId, parent_id: null, order: newOrder });
   };
 
   const dropOnTask = (e: any, listId: string, targetTaskId: string) => {
@@ -388,6 +656,9 @@ export const useTasks = () => {
       return next;
     });
     dragDataRef.current = null;
+    const targetTask = store.getState().lists.lists.flatMap((l: any) => l.tasks).find((t: any) => t.id === targetTaskId);
+    const newOrder = targetTask ? (targetTask.subtasks?.length || 0) : 0;
+    syncToBackend(d.taskId, { parent_id: targetTaskId, order: newOrder });
   };
 
   const dropOnListHeader = (e: any, targetListId: string) => {
@@ -428,6 +699,9 @@ export const useTasks = () => {
       return next;
     });
     setEditingTaskId(null);
+    const targetList = store.getState().lists.lists.find((l: any) => l.id === listId);
+    const newOrder = targetList ? targetList.tasks.length : 0;
+    syncToBackend(taskId, { parent_id: null, order: newOrder });
   };
 
   const indentTask = (taskId: string, listId: string) => {
@@ -436,17 +710,15 @@ export const useTasks = () => {
         if (l.id !== listId) return l;
         const idx = l.tasks.findIndex((t: any) => t.id === taskId);
         if (idx <= 0) return l;
+        const prevTask = l.tasks[idx - 1];
         const taskToIndent = l.tasks[idx];
-        const newParent = l.tasks[idx - 1];
-        if (newParent.completed) return l;
-        const updatedTasks = l.tasks
-          .filter((_: any, i: number) => i !== idx)
-          .map((t: any) =>
-            t.id === newParent.id
-              ? { ...t, subtasks: [...(t.subtasks || []), { ...taskToIndent, subtasks: [] }] }
-              : t
-          );
-        return { ...l, tasks: updatedTasks };
+        const newTasks = [...l.tasks];
+        newTasks.splice(idx, 1);
+        const newOrder = prevTask.subtasks?.length || 0;
+        newTasks[idx - 1] = { ...prevTask, subtasks: [...(prevTask.subtasks || []), taskToIndent] };
+
+        syncToBackend(taskId, { parent_id: prevTask.id || prevTask._id, order: newOrder });
+        return { ...l, tasks: newTasks };
       })
     );
     setEditingTaskId(null);
@@ -465,8 +737,8 @@ export const useTasks = () => {
     calendarFor, setCalendarFor, editDeadlineFor, setEditDeadlineFor, timeFor, setTimeFor, repeatFor, setRepeatFor,
     tomorrowClickCount, setTomorrowClickCount, dragData: dragDataRef, dragOverTarget, setDragOverTarget,
     findTaskEverywhere, updateTaskEverywhere, removeTaskEverywhere, removeTaskFromTree,
-    toggleComplete, toggleStar, setTitle, setDetails, setDue, setDueDate, setDueTime, setRepeat, clearDue,
-    setAssign, deleteTaskById, closeEditing, addTaskToList, addSubtask, moveTaskToList, moveTaskToNewList,
+    toggleComplete, toggleStar, setTitle, setDetails, setDate, setDueDate, setDueTime, setDueDateAndTime, setRepeat, clearDue,
+    setAssign, deleteTaskById, closeEditing, uploadTaskAttachment, removeTaskAttachment, addTaskToList, addSubtask, moveTaskToList, moveTaskToNewList,
     handleTomorrowClick, handleTodayClick, updateList, setSortBy, startRename, commitRename, deleteList,
     deleteAllCompleted, addList, toggleCompletedSection, onDragStartTask, onDragStartList, onDragStartAssign,
     onDragEnd, dropOnList, dropOnTask, dropOnListHeader, dropAssign, promoteToMainTask, indentTask, getTask,

@@ -62,10 +62,11 @@ export const ListPicker = ({ lists, currentListId, onPick, onNewList }: any) => 
 
 export const AssignChip = ({ assign, onRemove }: any) => {
   if (!assign) return null;
-  const cfg = ASSIGN_PALETTE.find((a) => a.type === assign.type);
+  const type = assign.type || (assign.role === "Admin" ? "owner" : assign.role === "Unit Head" ? "unit" : "team");
+  const cfg = ASSIGN_PALETTE.find((a) => a.type === type);
   const Icon = cfg?.icon || UserIcon;
   return (
-    <span className={`inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-full text-xs font-medium border ${ASSIGN_COLORS[assign.type]}`}>
+    <span className={`inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-full text-xs font-medium border ${ASSIGN_COLORS[type] || "bg-gray-100 text-gray-700 border-gray-200"}`}>
       <Icon size={12} />
       {assign.name}
       {onRemove && <button onClick={onRemove} className="ml-0.5 rounded-full hover:bg-black/10 p-0.5"><X size={11} /></button>}

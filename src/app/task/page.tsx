@@ -10,20 +10,20 @@ import { fetchListsByUser, resetLists } from "../../redux/slices/listSlice";
 function AppContent() {
   const dispatch = useDispatch();
   const authUser = useSelector((state: any) => state.auth.user);
-  
+
   let userId = authUser?._id;
   if (!userId && typeof window !== "undefined") {
     try {
       const token = localStorage.getItem("token");
       if (token) userId = JSON.parse(atob(token.split(".")[1]))?.id;
-    } catch (e) {}
+    } catch (e) { }
   }
 
   const {
     lists, addingList, setAddingList, newListName, setNewListName, addList, closeEditing,
-    calendarFor, setCalendarFor, calTask, setTimeFor, setRepeatFor, setDueDate, setTomorrowClickCount,
+    calendarFor, setCalendarFor, calTask, setTimeFor, setRepeatFor, setDueDate, setDueDateAndTime, setTomorrowClickCount,
     editDeadlineFor, setEditDeadlineFor, editTask, clearDue, timeFor, getTask, setDueTime, repeatFor, setRepeat,
-    loadMoreLists, hasMore, loadingLists
+    loadMoreLists, hasMore, loadingLists, setDate
   } = useTasks() as any;
 
   console.log("AppContent Rendered - lists from useTasks:", lists);
@@ -36,17 +36,17 @@ function AppContent() {
   }, [userId, dispatch]);
 
   const observerRef = useRef<IntersectionObserver | null>(null);
-  
+
   const lastListElementRef = useCallback((node: any) => {
     if (loadingLists) return;
     if (observerRef.current) observerRef.current.disconnect();
-    
+
     observerRef.current = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && hasMore) {
         loadMoreLists();
       }
     });
-    
+
     if (node) observerRef.current.observe(node);
   }, [loadingLists, hasMore, loadMoreLists]);
 
@@ -107,12 +107,10 @@ function AppContent() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setCalendarFor(null)}>
           <div onClick={e => e.stopPropagation()}>
             <CalendarPicker
-              value={getTask(calendarFor)?.dueDate || null}
-              showTimeRepeat={true}
-              onSetTime={() => { setTimeFor(calendarFor); setCalendarFor(null); }}
-              onSetRepeat={() => { setRepeatFor(calendarFor); setCalendarFor(null); }}
+              value={getTask(calendarFor)?.date || null}
+              showTimeRepeat={false}
               onChange={(dateStr: string) => {
-                setDueDate(calendarFor, dateStr);
+                setDate(calendarFor, dateStr);
                 setTomorrowClickCount((p: any) => ({ ...p, [calendarFor]: 0 }));
               }}
               onClose={() => setCalendarFor(null)}
@@ -127,10 +125,10 @@ function AppContent() {
           <div onClick={e => e.stopPropagation()}>
             <CalendarPicker
               value={getTask(editDeadlineFor)?.dueDate || null}
-              showTimeRepeat={true}
-              onSetTime={() => { setTimeFor(editDeadlineFor); setEditDeadlineFor(null); }}
-              onSetRepeat={() => { setRepeatFor(editDeadlineFor); setEditDeadlineFor(null); }}
-              onChange={(dateStr: string) => setDueDate(editDeadlineFor, dateStr)}
+              showTimeRepeat={false}
+              onChange={(dateStr: string, timeStr?: string | null) => {
+                setDueDateAndTime(editDeadlineFor, dateStr, timeStr);
+              }}
               onDelete={() => { clearDue(editDeadlineFor); setEditDeadlineFor(null); }}
               onClose={() => setEditDeadlineFor(null)}
             />
@@ -157,7 +155,10 @@ function AppContent() {
           <div onClick={e => e.stopPropagation()}>
             <RepeatModal
               value={getTask(repeatFor)?.repeat}
-              onChange={(r: any) => setRepeat(repeatFor, r)}
+              onChange={(repeatData: any, timeStr?: string | null) => {
+                setRepeat(repeatFor, { enabled: true, ...repeatData });
+                if (timeStr) setDueTime(repeatFor, timeStr);
+              }}
               onClose={() => setRepeatFor(null)}
             />
           </div>

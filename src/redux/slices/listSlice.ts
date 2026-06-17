@@ -12,7 +12,7 @@ export const fetchListsByUser = createAsyncThunk(
       const resData = response.data;
       let fetchedData = [];
       let pagination = { totalPages: 1, currentPage: 1 };
-      
+
       if (resData && resData.data && Array.isArray(resData.data)) {
         fetchedData = resData.data;
         pagination = resData.pagination || pagination;
@@ -80,7 +80,7 @@ export const fetchTasksForList = createAsyncThunk(
       const resData = response.data;
       let fetchedTasks: any[] = [];
       let pagination = { totalPages: 1, currentPage: page };
-      
+
       if (resData && resData.data && Array.isArray(resData.data)) {
         fetchedTasks = resData.data;
         pagination = resData.pagination || pagination;
@@ -95,7 +95,15 @@ export const fetchTasksForList = createAsyncThunk(
         completed: t.status === "Completed" || false,
         starred: t.isStarred || false,
         details: t.description || "",
-        dueDate: t.deadline || t.date || null,
+        date: t.date || null,
+        dueDate: t.deadline || null,
+        attachments: Array.isArray(t.file) ? t.file.map((f: string, idx: number) => ({
+          id: `att-${t._id || t.id}-${idx}`,
+          name: f.split('/').pop() || f,
+          url: `${process.env.NEXT_PUBLIC_IMAGE_URL || "http://localhost:5000"}/${f}`,
+          type: "unknown",
+          rawPath: f
+        })) : [],
         assign: t.assigned_to_user ? {
           id: t.assigned_to_user._id || t.assigned_to_user.id,
           name: t.assigned_to_user.name || t.assigned_to_user.fullName,
@@ -107,7 +115,15 @@ export const fetchTasksForList = createAsyncThunk(
           completed: s.status === "Completed" || false,
           starred: s.isStarred || false,
           details: s.description || "",
-          dueDate: s.deadline || s.date || null
+          date: s.date || null,
+          dueDate: s.deadline || null,
+          attachments: Array.isArray(s.file) ? s.file.map((f: string, idx: number) => ({
+            id: `att-sub-${s._id || s.id}-${idx}`,
+            name: f.split('/').pop() || f,
+            url: `${process.env.NEXT_PUBLIC_IMAGE_URL || "http://localhost:5000"}/${f}`,
+            type: "unknown",
+            rawPath: f
+          })) : []
         })) : []
       }));
 
@@ -149,7 +165,7 @@ const listSlice = createSlice({
       state.loading = false;
       console.log("listSlice - fetchListsByUser.fulfilled - action.payload:", action.payload);
       const { data, page, totalPages } = action.payload;
-      
+
       const formattedLists = data.map((l: any) => ({
         ...l,
         id: l._id || l.id,
@@ -169,7 +185,7 @@ const listSlice = createSlice({
         const newLists = formattedLists.filter(l => !existingIds.has(l.id));
         state.lists = [...state.lists, ...newLists];
       }
-      
+
       console.log("listSlice - Updated state.lists:", JSON.parse(JSON.stringify(state.lists)));
       state.currentPage = page;
       state.totalPages = totalPages;

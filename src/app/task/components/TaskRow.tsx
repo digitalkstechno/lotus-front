@@ -2,10 +2,10 @@ import React from "react";
 import {
   Circle, CheckCircle2, ChevronDown, ChevronRight, GripVertical, Clock, Plus, X, Check,
   Building2, Users, User as UserIcon, ListChecks, MoreVertical, Star, ArrowLeftRight,
-  AlignLeft, CirclePlus, Target, CornerDownRight, Paperclip, Trash2, ListPlus, Pencil, Printer, RefreshCw
+  AlignLeft, CirclePlus, Target, CornerDownRight, Paperclip, Trash2, ListPlus, Pencil, Printer, RefreshCw, Eye, Download
 } from "lucide-react";
 import { useTasks } from "../hooks/useTasks";
-import { formatDueLabel, newTask, uid } from "../lib/utils";
+import { formatDueLabel, newTask, uid, formatDate } from "../lib/utils";
 import { MONTHS, ASSIGN_COLORS } from "../lib/constants";
 import { Overlay, MenuItem, ListPicker, AssignChip } from "./Shared";
 
@@ -17,14 +17,95 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0 }: any) => {
     findTaskEverywhere, toggleComplete, toggleStar, setTitle, setDetails, setCalendarFor,
     setEditDeadlineFor, setRepeatFor, setAssign, deleteTaskById, moveTaskToList, moveTaskToNewList,
     handleTomorrowClick, handleTodayClick, onDragStartTask, onDragEnd, dropAssign, dropOnTask,
-    updateTaskEverywhere, indentTask, promoteToMainTask, dragData, fetchPeople, loadingPeople
+    updateTaskEverywhere, indentTask, promoteToMainTask, dragData, fetchPeople, loadingPeople, setDate, clearDue, uploadTaskAttachment, removeTaskAttachment
   } = useTasks();
+
+  const [menuCoords, setMenuCoords] = React.useState<any>(null);
+  const [pendingFile, setPendingFile] = React.useState<File | null>(null);
 
   const task = findTaskEverywhere(taskProp.id)?.task || taskProp;
   const isEditing = editingTaskId === task.id;
   const isDragOver = dragOverTarget?.kind === "task-target" && dragOverTarget.id === task.id;
   const tomorrowCount = tomorrowClickCount[task.id] || 0;
   const dueLabel = formatDueLabel(task);
+
+  const renderPendingFileModal = () => {
+    if (!pendingFile) return null;
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50" onClick={(e) => { e.stopPropagation(); setPendingFile(null); }}>
+        <div className="bg-white rounded-2xl shadow-2xl p-6 w-[340px] space-y-5 transform transition-all" onClick={(e) => e.stopPropagation()}>
+          <div className="flex justify-between items-center">
+            <h3 className="text-base font-semibold text-gray-900">Upload Attachment</h3>
+            <button onClick={() => setPendingFile(null)} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={18} /></button>
+          </div>
+          <div className="flex items-center gap-3 text-sm text-gray-700 bg-gray-50/80 p-4 rounded-xl border border-gray-100">
+             <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+               <Paperclip size={16} />
+             </div>
+             <span className="truncate flex-1 font-medium">{pendingFile.name}</span>
+          </div>
+          <div className="flex gap-3 justify-end pt-2">
+            <button onClick={() => setPendingFile(null)} className="px-4 py-2 text-sm font-medium rounded-xl text-gray-600 hover:bg-gray-100 transition-colors">Cancel</button>
+            <button onClick={() => {
+               const tempId = uid();
+               const url = URL.createObjectURL(pendingFile);
+               const tempAttachment = { id: tempId, name: pendingFile.name, url, type: pendingFile.type };
+               updateTaskEverywhere(task.id, (t: any) => ({ ...t, attachments: [...(t.attachments || []), tempAttachment] }));
+               uploadTaskAttachment(task.id, pendingFile, tempId);
+               setPendingFile(null);
+            }} className="px-5 py-2 text-sm font-medium rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 transition-colors shadow-sm shadow-emerald-500/20">Upload</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderAttachmentsModal = () => {
+    if (openAttFor !== task.id) return null;
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50" onClick={(e) => { e.stopPropagation(); setOpenAttFor(null); }}>
+        <div className="bg-white rounded-2xl shadow-2xl p-6 w-[400px] max-w-full space-y-4 transform transition-all" onClick={(e) => e.stopPropagation()}>
+          <div className="flex justify-between items-center">
+            <h3 className="text-base font-semibold text-gray-900">Attachments ({task.attachments?.length || 0})</h3>
+            <button onClick={() => setOpenAttFor(null)} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={18} /></button>
+          </div>
+          <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1">
+            {task.attachments?.map((att: any) => (
+              <div key={att.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                   <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                     <Paperclip size={16} />
+                   </div>
+                   <span className="truncate text-sm font-medium text-gray-700">{att.name}</span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <a href={att.url} target="_blank" rel="noopener noreferrer" className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="View">
+                    <Eye size={14} />
+                  </a>
+                  <a href={att.url} download={att.name} target="_blank" rel="noopener noreferrer" className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors" title="Download">
+                    <Download size={14} />
+                  </a>
+                  <button onClick={() => removeTaskAttachment(task.id, att)} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderFileInput = () => (
+    <input id={`att-input-${task.id}`} type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" className="hidden"
+      onChange={(e) => {
+        const file = e.target.files?.[0]; if (!file) return;
+        setPendingFile(file);
+        e.target.value = "";
+      }}
+    />
+  );
 
   if (isEditing) {
     return (
@@ -87,30 +168,36 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0 }: any) => {
                   <Star size={16} className={task.starred ? "fill-amber-400 text-amber-400" : ""} />
                 </button>
                 <div className="relative">
-                  <button onClick={() => setOpenTaskMenu(openTaskMenu === task.id ? null : task.id)} className="text-gray-400 hover:text-gray-600 p-0.5">
+                  <button onClick={(e) => {
+                    e.stopPropagation();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const spaceBelow = window.innerHeight - rect.bottom;
+                    const style: any = { right: window.innerWidth - rect.right, overflowY: "auto" };
+                    if (spaceBelow < 350) {
+                      style.bottom = window.innerHeight - rect.top + 4;
+                      style.maxHeight = rect.top - 16;
+                    } else {
+                      style.top = rect.bottom + 4;
+                      style.maxHeight = spaceBelow - 16;
+                    }
+                    setMenuCoords(style);
+                    setOpenTaskMenu(openTaskMenu === task.id ? null : task.id);
+                  }} className="text-gray-400 hover:text-gray-600 p-0.5">
                     <MoreVertical size={16} />
                   </button>
                   {openTaskMenu === task.id && (
                     <>
                       <Overlay onClose={() => setOpenTaskMenu(null)} />
-                      <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-100 z-50 py-1">
-                        <MenuItem icon={Target} onClick={() => { setCalendarFor(task.id); setOpenTaskMenu(null); }}>Add deadline</MenuItem>
-                        <MenuItem icon={CornerDownRight} onClick={() => indentTask(task.id, list.id)}>Indent</MenuItem>
-                        <MenuItem icon={CornerDownRight} onClick={() => { const sub = newTask(""); updateTaskEverywhere(task.id, (t: any) => ({ ...t, subtasks: [...t.subtasks, sub] })); setEditingTaskId(sub.id); setOpenTaskMenu(null); }}>Add a subtask</MenuItem>
-                        <MenuItem icon={Paperclip} onClick={() => { setOpenTaskMenu(null); document.getElementById(`att-input-${task.id}`)?.click(); }}>Add attachment</MenuItem>
-                        <input id={`att-input-${task.id}`} type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]; if (!file) return;
-                            const url = URL.createObjectURL(file);
-                            const attachment = { id: uid(), name: file.name, url, type: file.type };
-                            updateTaskEverywhere(task.id, (t: any) => ({ ...t, attachments: [...(t.attachments || []), attachment] }));
-                            setEditingTaskId(task.id);
-                            e.target.value = "";
-                          }}
-                        />
-                        <MenuItem icon={Trash2} danger onClick={() => { deleteTaskById(task.id); setOpenTaskMenu(null); }}>Delete</MenuItem>
-                        <div className="border-t border-gray-100 my-1" />
-                        <ListPicker lists={lists} currentListId={list.id} onPick={(toId: string) => moveTaskToList(task.id, parentId, toId)} onNewList={(name: string) => moveTaskToNewList(task.id, parentId, name)} />
+                      <div className="fixed w-56 bg-white rounded-lg shadow-lg border border-gray-100 z-[60]" style={menuCoords} onClick={(e) => e.stopPropagation()}>
+                        <div className="py-1">
+                          <MenuItem icon={Target} onClick={() => { setCalendarFor(task.id); setOpenTaskMenu(null); }}>Add deadline</MenuItem>
+                          <MenuItem icon={CornerDownRight} onClick={() => indentTask(task.id, list.id)}>Indent</MenuItem>
+                          <MenuItem icon={CornerDownRight} onClick={() => { const sub = newTask(""); updateTaskEverywhere(task.id, (t: any) => ({ ...t, subtasks: [...t.subtasks, sub] })); setEditingTaskId(sub.id); setOpenTaskMenu(null); }}>Add a subtask</MenuItem>
+                          <MenuItem icon={Paperclip} onClick={() => { setOpenTaskMenu(null); document.getElementById(`att-input-${task.id}`)?.click(); }}>Add attachment</MenuItem>
+                          <MenuItem icon={Trash2} danger onClick={() => { deleteTaskById(task.id); setOpenTaskMenu(null); }}>Delete</MenuItem>
+                          <div className="border-t border-gray-100 my-1" />
+                          <ListPicker lists={lists} currentListId={list.id} onPick={(toId: string) => moveTaskToList(task.id, parentId, toId)} onNewList={(name: string) => moveTaskToNewList(task.id, parentId, name)} />
+                        </div>
                       </div>
                     </>
                   )}
@@ -121,20 +208,26 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0 }: any) => {
           <div className="ml-9 mt-2 space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
-                {(task.due === "today" || !task.due) && (
-                  <button onClick={() => handleTodayClick(task.id, task)} className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${task.due === "today" ? "bg-emerald-500 text-white border-emerald-500" : "bg-white text-gray-600 border-gray-200 hover:border-emerald-500 hover:text-emerald-500"}`}>Today</button>
-                )}
-                {(task.due === "tomorrow" || !task.due) && (
-                  <button onClick={() => handleTomorrowClick(task.id, task)} className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${task.due === "tomorrow" ? "bg-emerald-500 text-white border-emerald-500" : "bg-white text-gray-600 border-gray-200 hover:border-emerald-500 hover:text-emerald-500"}`}>Tomorrow</button>
-                )}
-                {task.dueDate ? (
-                  <button onClick={() => setEditDeadlineFor(task.id)} className="px-2 py-1 rounded-full text-xs font-medium border bg-emerald-500 text-white border-emerald-500 flex items-center gap-1">
-                    <Clock size={12} />{(() => { const d = new Date(task.dueDate); return `${d.getDate()} ${MONTHS[d.getMonth()]}`; })()}{task.dueTime && ` · ${task.dueTime}`}
+                {task.date && (
+                  <button onClick={() => setDate(task.id, null)} className="px-2 py-1 rounded-full text-xs font-medium border transition-colors bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 flex items-center gap-1 capitalize">
+                    <Clock size={12} /> {formatDate(task.date)} <X size={10} className="ml-0.5" />
                   </button>
-                ) : (
-                  <button onClick={() => setCalendarFor(task.id)} className="p-1.5 rounded-full border bg-white text-gray-500 border-gray-200 hover:border-emerald-500 hover:text-emerald-500 transition-colors" title="Pick a date"><Clock size={14} /></button>
                 )}
-                <button onClick={() => setRepeatFor(task.id)} className={`p-1.5 rounded-full border transition-colors ${task.repeat ? "bg-emerald-500 text-white border-emerald-500" : "bg-white text-gray-500 border-gray-200 hover:border-emerald-500 hover:text-emerald-500"}`} title="Repeat"><RefreshCw size={14} /></button>
+                {!task.date && (
+                  <>
+                    <button onClick={() => handleTodayClick(task.id, task)} className="px-3 py-1 rounded-full text-xs font-medium border transition-colors bg-white text-gray-600 border-gray-200 hover:border-emerald-500 hover:text-emerald-500">Today</button>
+                    <button onClick={() => handleTomorrowClick(task.id, task)} className="px-3 py-1 rounded-full text-xs font-medium border transition-colors bg-white text-gray-600 border-gray-200 hover:border-emerald-500 hover:text-emerald-500">Tomorrow</button>
+                  </>
+                )}
+                {task.dueDate && (
+                  <button onClick={() => setEditDeadlineFor(task.id)} className="px-2 py-1 rounded-full text-xs font-medium border flex items-center gap-1 transition-colors bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400">
+                    <Target size={12} className="text-gray-400" /> Due {dueLabel}{task.dueTime && ` · ${task.dueTime}`}
+                    <span onClick={(e) => { e.stopPropagation(); clearDue(task.id); }} className="ml-0.5 rounded-full hover:bg-black/10 p-0.5"><X size={10} /></span>
+                  </button>
+                )}
+                <button onClick={() => setCalendarFor(task.id)} className="p-1.5 rounded-full border bg-white text-gray-500 border-gray-200 hover:border-emerald-500 hover:text-emerald-500 transition-colors" title="Pick a date"><Clock size={14} /></button>
+                <button onClick={() => setEditDeadlineFor(task.id)} className="p-1.5 rounded-full border bg-white text-gray-500 border-gray-200 hover:border-emerald-500 hover:text-emerald-500 transition-colors" title="Add deadline"><Target size={14} /></button>
+                <button onClick={() => setRepeatFor(task.id)} className={`p-1.5 rounded-full border transition-colors ${task.repeat?.enabled ? "bg-emerald-500 text-white border-emerald-500" : "bg-white text-gray-500 border-gray-200 hover:border-emerald-500 hover:text-emerald-500"}`} title="Repeat"><RefreshCw size={14} /></button>
               </div>
               {depth === 0 && (
                 <div className="relative">
@@ -152,8 +245,19 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0 }: any) => {
             </div>
             <input type="text" value={task.details} onChange={(e) => setDetails(task.id, e.target.value)} placeholder="Add details..." className="w-full text-sm bg-transparent focus:outline-none border-b border-gray-200 focus:border-emerald-500 pb-0.5 text-gray-600 placeholder-gray-300" />
             <div className="relative">
-              <div onClick={() => {
+              <div onClick={(e) => {
                 if (openAssignFor !== task.id) fetchPeople();
+                const rect = e.currentTarget.getBoundingClientRect();
+                const spaceBelow = window.innerHeight - rect.bottom;
+                const style: any = { left: rect.left, overflowY: "auto" };
+                if (spaceBelow < 250) {
+                  style.bottom = window.innerHeight - rect.top + 4;
+                  style.maxHeight = rect.top - 16;
+                } else {
+                  style.top = rect.bottom + 4;
+                  style.maxHeight = spaceBelow - 16;
+                }
+                setMenuCoords(style);
                 setOpenAssignFor(openAssignFor === task.id ? null : task.id);
               }} className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 w-full cursor-pointer transition-colors ${openAssignFor === task.id ? "border-emerald-500 bg-emerald-50" : "border-dashed border-gray-200 hover:border-emerald-400"}`}>
                 <span className="text-xs text-gray-400 flex-shrink-0">Assign to</span>
@@ -167,7 +271,7 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0 }: any) => {
               {openAssignFor === task.id && (
                 <>
                   <Overlay onClose={() => setOpenAssignFor(null)} />
-                  <div className="absolute left-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                  <div className="fixed w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-[60] overflow-hidden flex flex-col" style={menuCoords}>
                     {loadingPeople ? (
                       <p className="px-3 py-3 text-xs text-gray-400 italic">Loading staff...</p>
                     ) : orgPeople.length === 0 ? (
@@ -187,30 +291,19 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0 }: any) => {
             </div>
             {(task.attachments || []).length > 0 && (
               <div className="relative" onClick={(e) => e.stopPropagation()}>
-                <button onClick={(e) => { e.stopPropagation(); setOpenAttFor(openAttFor === task.id ? null : task.id); }} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors text-[11px] font-medium">
+                <button onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenAttFor(openAttFor === task.id ? null : task.id);
+                }} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors text-[11px] font-medium">
                   <Paperclip size={11} />{task.attachments.length} attachment{task.attachments.length > 1 ? "s" : ""}
                 </button>
-                {openAttFor === task.id && (
-                  <>
-                    <Overlay onClose={() => setOpenAttFor(null)} />
-                    <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
-                      <div className="max-h-40 overflow-y-auto py-1">
-                        {task.attachments.map((att: any) => (
-                          <div key={att.id} className="relative group/att">
-                            <a href={att.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-3 py-2 pr-7 hover:bg-emerald-50 transition-colors" onClick={(e) => e.stopPropagation()}>
-                              <Paperclip size={11} className="text-gray-400 shrink-0" /><span className="text-xs text-gray-700 truncate">{att.name}</span>
-                            </a>
-                            <button onClick={(e) => { e.stopPropagation(); updateTaskEverywhere(task.id, (t: any) => ({ ...t, attachments: (t.attachments || []).filter((a: any) => a.id !== att.id) })); }} className="absolute right-1.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 text-white rounded-full hidden group-hover/att:flex items-center justify-center"><X size={9} /></button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
               </div>
             )}
           </div>
         </div>
+        {renderPendingFileModal()}
+        {renderAttachmentsModal()}
+        {renderFileInput()}
       </div>
     );
   }
@@ -233,31 +326,33 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0 }: any) => {
         </div>
         <div className="flex-1 min-w-0">
           <p className={`text-[13px] leading-snug ${task.completed ? "text-gray-400 line-through" : "text-gray-800 font-medium"}`}>{task.title}</p>
-          {(task.due || task.dueDate || task.assign || task.subtasks?.length > 0 || task.details || task.attachments?.length > 0) && (
+          {(task.date || task.dueDate || task.assign || task.subtasks?.length > 0 || task.details || task.attachments?.length > 0) && (
             <div className="flex flex-wrap items-center gap-1.5 mt-1">
               {task.details && <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 flex items-center gap-1"><AlignLeft size={11} /> Details</span>}
-              {(task.due || task.dueDate) && (
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 capitalize flex items-center gap-1">
-                  <Clock size={10} />{dueLabel}{task.dueTime && ` · ${task.dueTime}`}{task.repeat && <RefreshCw size={10} />}
+              {task.date && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full capitalize flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <Clock size={10} /> {formatDate(task.date)}
+                </span>
+              )}
+              {task.dueDate && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full capitalize flex items-center gap-1 bg-white text-gray-600 border border-gray-300">
+                  <Target size={10} className="text-gray-400" />
+                  Due {dueLabel}{task.dueTime && ` · ${task.dueTime}`}
+                </span>
+              )}
+              {task.repeat?.enabled && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-white text-gray-600 border border-gray-300 flex items-center gap-1">
+                  <RefreshCw size={10} className="text-gray-400" />
                 </span>
               )}
               {task.attachments?.length > 0 && (
                 <div className="relative">
-                  <button onClick={(e) => { e.stopPropagation(); setOpenAttFor(openAttFor === task.id ? null : task.id); }} className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 flex items-center gap-1 hover:bg-blue-100 transition-colors">
+                  <button onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenAttFor(openAttFor === task.id ? null : task.id);
+                  }} className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 flex items-center gap-1 hover:bg-blue-100 transition-colors">
                     <Paperclip size={10} />{task.attachments.length}
                   </button>
-                  {openAttFor === task.id && (
-                    <>
-                      <Overlay onClose={() => setOpenAttFor(null)} />
-                      <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
-                        {task.attachments.map((att: any) => (
-                          <a key={att.id} href={att.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-3 py-2 hover:bg-emerald-50 transition-colors" onClick={(e) => e.stopPropagation()}>
-                            <Paperclip size={11} className="text-gray-400 shrink-0" /><span className="text-xs text-gray-700 truncate">{att.name}</span>
-                          </a>
-                        ))}
-                      </div>
-                    </>
-                  )}
                 </div>
               )}
             </div>
@@ -270,40 +365,56 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0 }: any) => {
             </button>
           )}
           <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); setOpenTaskMenu(openTaskMenu === task.id ? null : task.id); }} className="p-0.5 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 transition-opacity">
+            <button onClick={(e) => {
+              e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
+              const spaceBelow = window.innerHeight - rect.bottom;
+              const style: any = { right: window.innerWidth - rect.right, overflowY: "auto" };
+              if (spaceBelow < 350) {
+                style.bottom = window.innerHeight - rect.top + 4;
+                style.maxHeight = rect.top - 16;
+              } else {
+                style.top = rect.bottom + 4;
+                style.maxHeight = spaceBelow - 16;
+              }
+              setMenuCoords(style);
+              setOpenTaskMenu(openTaskMenu === task.id ? null : task.id);
+            }} className="p-0.5 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 transition-opacity">
               <MoreVertical size={15} />
             </button>
             {openTaskMenu === task.id && (
               <>
                 <Overlay onClose={() => setOpenTaskMenu(null)} />
-                <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-100 z-50 py-1" onClick={(e) => e.stopPropagation()}>
-                  {depth === 0 ? (
-                    <>
-                      <MenuItem icon={Target} onClick={() => { setCalendarFor(task.id); setOpenTaskMenu(null); }}>Add deadline</MenuItem>
-                      <MenuItem icon={CornerDownRight} onClick={(e: any) => { e.stopPropagation(); const sub = newTask(""); updateTaskEverywhere(task.id, (t: any) => ({ ...t, subtasks: [...t.subtasks, sub] })); setEditingTaskId(sub.id); setOpenTaskMenu(null); }}>Add a subtask</MenuItem>
-                      <MenuItem icon={CornerDownRight} onClick={() => { indentTask(task.id, list.id); setOpenTaskMenu(null); }}>Indent</MenuItem>
-                      <MenuItem icon={Paperclip} onClick={() => { setOpenTaskMenu(null); document.getElementById(`att-input-non-${task.id}`)?.click(); }}>Add attachment</MenuItem>
-                      <input id={`att-input-non-${task.id}`} type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]; if (!file) return;
-                          const url = URL.createObjectURL(file);
-                          const attachment = { id: uid(), name: file.name, url, type: file.type };
-                          updateTaskEverywhere(task.id, (t: any) => ({ ...t, attachments: [...(t.attachments || []), attachment] }));
-                          e.target.value = "";
-                        }}
-                      />
-                      <MenuItem icon={Trash2} danger onClick={() => { deleteTaskById(task.id); setOpenTaskMenu(null); }}>Delete</MenuItem>
-                      <div className="border-t border-gray-100 my-1" />
-                      <ListPicker lists={lists} currentListId={list.id} onPick={(toId: string) => moveTaskToList(task.id, parentId, toId)} onNewList={(name: string) => moveTaskToNewList(task.id, parentId, name)} />
-                    </>
-                  ) : (
-                    <>
-                      <MenuItem icon={ArrowLeftRight} onClick={() => { promoteToMainTask(task.id, parentId, list.id); setOpenTaskMenu(null); }}>Make main task</MenuItem>
-                      <MenuItem icon={Trash2} danger onClick={() => { deleteTaskById(task.id); setOpenTaskMenu(null); }}>Delete</MenuItem>
-                      <div className="border-t border-gray-100 my-1" />
-                      <ListPicker lists={lists} currentListId={list.id} onPick={(toId: string) => moveTaskToList(task.id, parentId, toId)} onNewList={(name: string) => moveTaskToNewList(task.id, parentId, name)} />
-                    </>
-                  )}
+                <div className="fixed w-56 bg-white rounded-lg shadow-lg border border-gray-100 z-[60]" style={menuCoords} onClick={(e) => e.stopPropagation()}>
+                  <div className="py-1">
+                    {depth === 0 ? (
+                      <>
+                        <MenuItem icon={Target} onClick={() => { setCalendarFor(task.id); setOpenTaskMenu(null); }}>Add deadline</MenuItem>
+                        <MenuItem icon={CornerDownRight} onClick={(e: any) => {
+                          e.stopPropagation();
+                          const sub = newTask("");
+                          (sub as any).isNew = true;
+                          sub.order = task.subtasks?.length || 0;
+                          updateTaskEverywhere(task.id, (t: any) => ({ ...t, subtasks: [...t.subtasks, sub] }));
+                          setEditingTaskId(sub.id);
+                          setOpenTaskMenu(null);
+                        }}>Add a subtask</MenuItem>
+                        <MenuItem icon={CornerDownRight} onClick={() => { indentTask(task.id, list.id); setOpenTaskMenu(null); }}>Indent</MenuItem>
+                        <MenuItem icon={Paperclip} onClick={() => { setOpenTaskMenu(null); document.getElementById(`att-input-${task.id}`)?.click(); }}>Add attachment</MenuItem>
+                        <MenuItem icon={Trash2} danger onClick={() => { deleteTaskById(task.id); setOpenTaskMenu(null); }}>Delete</MenuItem>
+                        <div className="border-t border-gray-100 my-1" />
+                        <ListPicker lists={lists} currentListId={list.id} onPick={(toId: string) => moveTaskToList(task.id, parentId, toId)} onNewList={(name: string) => moveTaskToNewList(task.id, parentId, name)} />
+                      </>
+                    ) : (
+                      <>
+                        <MenuItem icon={ArrowLeftRight} onClick={() => { promoteToMainTask(task.id, parentId, list.id); setOpenTaskMenu(null); }}>Make main task</MenuItem>
+                        <MenuItem icon={Paperclip} onClick={() => { setOpenTaskMenu(null); document.getElementById(`att-input-${task.id}`)?.click(); }}>Add attachment</MenuItem>
+                        <MenuItem icon={Trash2} danger onClick={() => { deleteTaskById(task.id); setOpenTaskMenu(null); }}>Delete</MenuItem>
+                        <div className="border-t border-gray-100 my-1" />
+                        <ListPicker lists={lists} currentListId={list.id} onPick={(toId: string) => moveTaskToList(task.id, parentId, toId)} onNewList={(name: string) => moveTaskToNewList(task.id, parentId, name)} />
+                      </>
+                    )}
+                  </div>
                 </div>
               </>
             )}
@@ -317,6 +428,10 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0 }: any) => {
           ))}
         </div>
       )}
+      {renderPendingFileModal()}
+      {renderAttachmentsModal()}
+      {renderFileInput()}
     </div>
   );
 };
+
