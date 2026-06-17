@@ -55,15 +55,27 @@ export default function useFCM() {
             icon: "🔔"
           });
 
-          // Also trigger the native OS notification via Service Worker
-          if ("serviceWorker" in navigator) {
-            navigator.serviceWorker.ready.then((registration) => {
-              registration.showNotification(payload.notification!.title || "New Notification", {
-                body: payload.notification!.body,
-                icon: "/favicon.ico",
-                data: payload.data,
-              });
+          // Also trigger the native OS notification via Service Worker / Native API
+          try {
+            // First try standard Notification
+            const n = new Notification(payload.notification.title || "New Notification", {
+              body: payload.notification.body,
+              icon: "/favicon.ico"
             });
+            n.onclick = () => window.focus();
+          } catch (e) {
+            // Fallback to Service Worker if standard API is blocked or deprecated
+            if ("serviceWorker" in navigator) {
+              navigator.serviceWorker.getRegistration().then((registration) => {
+                if (registration) {
+                  registration.showNotification(payload.notification!.title || "New Notification", {
+                    body: payload.notification!.body,
+                    icon: "/favicon.ico",
+                    data: payload.data,
+                  });
+                }
+              });
+            }
           }
         }
       });
