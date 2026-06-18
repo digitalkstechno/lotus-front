@@ -56,3 +56,8 @@ export const updateListApi = (id: string, data: UpdateListPayload) => {
 export const deleteListApi = (id: string) => {
   return axiosInstance.delete(`/list/${id}`);
 };
+
+// PATCH /list/reorder  → bulk update all list orders in a single call
+export const reorderListsApi = (lists: { id: string; order: number }[]) => {
+  return axiosInstance.patch("/list/reorder", lists);
+};

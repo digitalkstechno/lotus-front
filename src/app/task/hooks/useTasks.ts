@@ -8,7 +8,40 @@ import * as uiActions from "../../../redux/slices/taskUISlice";
 import { store } from "../../../redux/store";
 import axiosInstance from "../../../utils/axios";
 import { setCredentials } from "../../../redux/slices/authSlice";
-import { createTaskApi, updateTaskApi, uploadTaskFilesApi, removeTaskAttachmentApi, deleteTaskApi } from "../../../services/taskService";
+import { createTaskApi, updateTaskApi, uploadTaskFilesApi, removeTaskAttachmentApi, deleteTaskApi, reorderTasksApi } from "../../../services/taskService";
+import { reorderListsApi } from "../../../services/listService";
+
+export class MutableItem {
+  id: string;
+  _chosen: boolean = false;
+  _selected: boolean = false;
+  _filtered: boolean = false;
+  [key: string]: any;
+
+  constructor(data: any) {
+    this.id = data.id;
+    for (const key in data) {
+      this[key] = data[key];
+    }
+  }
+
+  get chosen() { return this._chosen; }
+  set chosen(val) { this._chosen = val; }
+  get selected() { return this._selected; }
+  set selected(val) { this._selected = val; }
+  get filtered() { return this._filtered; }
+  set filtered(val) { this._filtered = val; }
+}
+
+export const makeMutable = (arr: any[]) => {
+  if (!arr) return [];
+  return JSON.parse(JSON.stringify(arr)).map((item: any) => new MutableItem(item));
+};
+
+export const unmakeMutable = (arr: any[]) => {
+  if (!arr) return [];
+  return JSON.parse(JSON.stringify(arr));
+};
 
 export const useTasks = () => {
   const dispatch = useDispatch();
@@ -553,9 +586,15 @@ export const useTasks = () => {
   const updateList = (listId: string, fn: (l: any) => any) => setLists((prev: any) => prev.map((l: any) => (l.id === listId ? fn(l) : l)));
 
   const setSortBy = (listId: string, value: string) => {
+    // 1. Update local Redux state immediately (optimistic)
     updateList(listId, (l) => ({ ...l, sortBy: value }));
+    // 2. Persist sortBy to backend
     dispatch(updateListThunk({ id: listId, data: { sortBy: value } }) as any);
     setOpenListMenu(null);
+    // 3. Re-fetch tasks for this list with the new sortBy so order is applied from server
+    if (userId) {
+      dispatch(fetchTasksForList({ listId, userId, page: 1, limit: 20, sortBy: value }) as any);
+    }
   };
 
   const startRename = (list: any) => {
@@ -601,90 +640,184 @@ export const useTasks = () => {
 
   const toggleCompletedSection = (listId: string) => dispatch(uiActions.toggleCollapsedCompleted(listId));
 
-  // --- Drag operations ---
-  const onDragStartTask = (e: any, listId: string, taskId: string, parentId: string | null) => {
-    dragDataRef.current = { kind: "task", listId, taskId, parentId };
-    e.dataTransfer.effectAllowed = "move";
-    e.stopPropagation();
-  };
-  const onDragStartList = (e: any, listId: string) => {
-    dragDataRef.current = { kind: "list", listId };
-    e.dataTransfer.effectAllowed = "move";
-  };
-  const onDragStartAssign = (e: any, assignType: string, name: string) => {
-    dragDataRef.current = { kind: "assign", assignType, name };
-    e.dataTransfer.effectAllowed = "copy";
-  };
-  const onDragEnd = () => {
-    dragDataRef.current = null;
-    setDragOverTarget(null);
+  // --- SortableJS Handlers ---
+  const handleListGroupChange = (newLists: any[]) => {
+    setLists(newLists);
   };
 
-  const dropOnList = (e: any, listId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const d = dragDataRef.current;
-    setDragOverTarget(null);
-    if (!d || d.kind !== "task") return;
-    const currentLists = store.getState().lists.lists;
-    const found = findTaskEverywhere(d.taskId, currentLists);
-    if (!found) return;
-    if (!found.parentId && found.listId === listId) return;
-    const task = { ...found.task, subtasks: found.parentId ? [] : (found.task.subtasks || []) };
+  const handleTaskGroupChange = (listId: string, parentId: string | null, newItems: any[]) => {
     setLists((prev: any) => {
-      let next = removeTaskFromTree(prev, found.listId, d.taskId, found.parentId);
-      next = next.map((l: any) => (l.id === listId ? { ...l, tasks: [...l.tasks, task] } : l));
-      return next;
+      if (!parentId) {
+        return prev.map((l: any) => l.id === listId ? { ...l, tasks: newItems } : l);
+      } else {
+        return prev.map((l: any) => l.id === listId ? {
+          ...l,
+          tasks: l.tasks.map((t: any) => t.id === parentId ? { ...t, subtasks: newItems } : t)
+        } : l);
+      }
     });
-    dragDataRef.current = null;
-    const targetList = store.getState().lists.lists.find((l: any) => l.id === listId);
-    const newOrder = targetList ? targetList.tasks.length : 0;
-    syncToBackend(d.taskId, { list_id: listId, parent_id: null, order: newOrder });
   };
 
-  const dropOnTask = (e: any, listId: string, targetTaskId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const d = dragDataRef.current;
-    setDragOverTarget(null);
-    if (!d || d.kind !== "task" || d.taskId === targetTaskId) return;
-    const currentLists = store.getState().lists.lists;
-    const found = findTaskEverywhere(d.taskId, currentLists);
-    if (!found) return;
-    const targetFound = findTaskEverywhere(targetTaskId, currentLists);
-    if (!targetFound) return;
-    const task = { ...found.task, subtasks: [] };
-    setLists((prev: any) => {
-      let next = removeTaskFromTree(prev, found.listId, d.taskId, found.parentId);
-      next = next.map((l: any) =>
-        l.id === listId
-          ? { ...l, tasks: l.tasks.map((t: any) => t.id === targetTaskId ? { ...t, subtasks: [...(t.subtasks || []), task] } : t) }
-          : l
+  const syncSortToBackend = async (taskId: string, payload: any, fromListId?: string | null) => {
+    console.log("[DnD] syncSortToBackend CALLED", { taskId, taskIdLength: taskId?.length, payload, fromListId });
+    if (taskId.length < 24) {
+      console.warn("[DnD] SKIPPED — taskId is a temp ID (length < 24)", taskId);
+      return;
+    }
+    try {
+      console.log("[DnD] Calling updateTaskApi with:", taskId, payload);
+      // 1. Send the primary update. Backend handles: parent_id $addToSet/$pull, list change, order.
+      await updateTaskApi(taskId, payload);
+      console.log("[DnD] updateTaskApi SUCCESS");
+
+      // 2. Re-fetch affected list(s) from backend so Redux state exactly matches DB.
+      //    This fixes: task appearing in two places, wrong nesting, stale subtask data.
+      const listsToRefresh = new Set<string>();
+      if (payload.list) listsToRefresh.add(payload.list);
+      if (fromListId && fromListId !== payload.list) listsToRefresh.add(fromListId);
+
+      for (const listId of listsToRefresh) {
+        console.log("[DnD] Re-fetching list from backend:", listId);
+        const currentLists = store.getState().lists.lists;
+        const targetList = currentLists.find((l: any) => l.id === listId);
+        const sortBy = targetList?.sortBy;
+        dispatch(fetchTasksForList({ listId, userId, page: 1, limit: 20, sortBy }) as any);
+      }
+    } catch (err) {
+      console.error("[DnD] syncSortToBackend FAILED", err);
+    }
+  };
+
+
+  const onSortEnd = (evt: any) => {
+    console.log("[DnD] ====== onSortEnd FIRED ======");
+    console.log("[DnD] evt.item:", evt.item);
+    console.log("[DnD] evt.item?.dataset:", evt.item?.dataset);
+    console.log("[DnD] evt.from?.dataset (raw):", evt.from?.dataset);
+    console.log("[DnD] evt.to?.dataset (raw):", evt.to?.dataset);
+    console.log("[DnD] evt.oldIndex:", evt.oldIndex, "evt.newIndex:", evt.newIndex);
+
+    // Read task ID from the dragged item's data attribute
+    const taskId = evt.item?.dataset?.taskId;
+    console.log("[DnD] taskId resolved:", taskId, "| length:", taskId?.length);
+
+    // ─── KEY FIX ─────────────────────────────────────────────────────────────
+    // ReactSortable does NOT forward data-* props to the actual DOM element,
+    // so evt.from.dataset and evt.to.dataset are always empty {}.
+    // Instead, we wrap each ReactSortable in a plain <div data-list-id data-parent-id>
+    // and use closest() to climb up to that wrapper.
+    // ─────────────────────────────────────────────────────────────────────────
+    const fromWrapper = evt.from?.closest?.("[data-list-id]");
+    const toWrapper   = evt.to?.closest?.("[data-list-id]");
+
+    const fromListId   = fromWrapper?.dataset?.listId   || null;
+    const fromParentId = fromWrapper?.dataset?.parentId || null; // "" → null
+
+    const toListId   = toWrapper?.dataset?.listId   || null;
+    const toParentId = toWrapper?.dataset?.parentId || null;     // "" → null
+
+    const newIndex = evt.newIndex;
+
+    console.log("[DnD] fromWrapper:", fromWrapper, "| toWrapper:", toWrapper);
+    console.log("[DnD] Parsed context:", { taskId, fromListId, fromParentId, toListId, toParentId, newIndex });
+
+    // Guard: skip if missing IDs or temp task (uid generates 7-char IDs, MongoDB IDs are 24 chars)
+    if (!taskId) {
+      console.error("[DnD] BLOCKED — taskId is undefined/empty. Check data-task-id on TaskRow outer div.");
+      return;
+    }
+    if (taskId.length < 24) {
+      console.warn("[DnD] BLOCKED — taskId is a temp/short ID (length:", taskId.length, "). Task not yet saved to DB.");
+      return;
+    }
+    if (!toListId) {
+      console.error("[DnD] BLOCKED — toListId is null. Wrapper div with data-list-id not found above ReactSortable container.");
+      return;
+    }
+
+    const sameList   = fromListId === toListId;
+    const sameParent = fromParentId === toParentId;
+    console.log("[DnD] sameList:", sameList, "sameParent:", sameParent);
+
+    if (sameList && sameParent) {
+      // ─────────────────────────────────────────────────────────────────────
+      // Case 1: Reordered within same list & same level
+      // Only need to persist the new order — no parent/list change needed.
+      // ─────────────────────────────────────────────────────────────────────
+      console.log("[DnD] CASE 1: Same-list reorder → calling reorderTasksApi");
+      setTimeout(async () => {
+        const currentLists = store.getState().lists.lists;
+        const targetList = currentLists.find((l: any) => l.id === toListId);
+        if (!targetList) {
+          console.error("[DnD] CASE 1: targetList not found for", toListId);
+          return;
+        }
+
+        let items: any[];
+        if (!toParentId) {
+          // Root-level tasks (exclude completed to match the visible sorted group)
+          items = targetList.tasks.filter((t: any) => !t.completed);
+        } else {
+          const parent = targetList.tasks.find((t: any) => t.id === toParentId);
+          items = parent?.subtasks || [];
+        }
+
+        const reorderPayload = items
+          .map((t: any, idx: number) => ({ id: t.id, order: idx }))
+          .filter((t: any) => t.id && t.id.length >= 24);
+
+        console.log("[DnD] CASE 1: reorderPayload:", reorderPayload);
+        if (reorderPayload.length > 0) {
+          reorderTasksApi(reorderPayload)
+            .then(() => console.log("[DnD] CASE 1: reorderTasksApi SUCCESS"))
+            .catch((e: any) => console.error("[DnD] CASE 1: reorderTasksApi FAILED", e));
+        } else {
+          console.warn("[DnD] CASE 1: reorderPayload is empty — no valid MongoDB IDs found");
+        }
+      }, 300);
+    } else {
+      // ─────────────────────────────────────────────────────────────────────
+      // Case 2: Cross-list move   → updateTaskApi({ list: toListId, parent_id: null })
+      // Case 3: Task → Subtask    → updateTaskApi({ parent_id: toParentId });
+      //          Backend: $addToSet subtask[] on new parent, $pull from old parent if existed
+      // Case 4: Subtask → Main    → updateTaskApi({ parent_id: null })
+      //          Backend: $pull from old parent's subtask[]
+      // syncSortToBackend handles: updateTaskApi + delayed reorderTasksApi for dest
+      // ─────────────────────────────────────────────────────────────────────
+      const reason = !sameList ? "cross-list move" : !sameParent ? "parent changed (subtask conversion)" : "unknown";
+      console.log("[DnD] CASE 2/3/4:", reason, "→ calling syncSortToBackend");
+      syncSortToBackend(
+        taskId,
+        {
+          list: toListId,
+          parent_id: toParentId,   // null = make main task; string = make subtask of that parent
+          order: newIndex
+        },
+        fromListId  // pass source list so it gets re-fetched too on cross-list moves
       );
-      return next;
-    });
-    dragDataRef.current = null;
-    const targetTask = store.getState().lists.lists.flatMap((l: any) => l.tasks).find((t: any) => t.id === targetTaskId);
-    const newOrder = targetTask ? (targetTask.subtasks?.length || 0) : 0;
-    syncToBackend(d.taskId, { parent_id: targetTaskId, order: newOrder });
+    }
   };
 
-  const dropOnListHeader = (e: any, targetListId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const d = dragDataRef.current;
-    setDragOverTarget(null);
-    if (!d || d.kind !== "list" || d.listId === targetListId) return;
-    setLists((prev: any) => {
-      const next = [...prev];
-      const fromIdx = next.findIndex((l: any) => l.id === d.listId);
-      const toIdx = next.findIndex((l: any) => l.id === targetListId);
-      const [moved] = next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, moved);
-      return next;
-    });
-    dragDataRef.current = null;
+  const onListSortEnd = (evt: any) => {
+    console.log("[DnD] ====== onListSortEnd FIRED ======");
+    // ─────────────────────────────────────────────────────────────────────
+    // Case 5: List column reorder
+    // Single bulk PATCH /list/reorder instead of N individual PUT calls
+    // ─────────────────────────────────────────────────────────────────────
+    const currentLists = store.getState().lists.lists;
+    const reorderPayload = currentLists.map((l: any, idx: number) => ({
+      id: l.id,
+      order: idx
+    }));
+    console.log("[DnD] List reorderPayload:", reorderPayload);
+    if (reorderPayload.length > 0) {
+      reorderListsApi(reorderPayload)
+        .then(() => console.log("[DnD] reorderListsApi SUCCESS"))
+        .catch((e: any) => console.error("[DnD] reorderListsApi FAILED", e));
+    }
   };
+
+
 
   const dropAssign = (e: any, taskId: string) => {
     e.preventDefault();
@@ -748,8 +881,8 @@ export const useTasks = () => {
     toggleComplete, toggleStar, setTitle, setDetails, setDate, setDueDate, setDueTime, setDueDateAndTime, setRepeat, clearDue,
     setAssign, deleteTaskById, closeEditing, uploadTaskAttachment, removeTaskAttachment, addTaskToList, addSubtask, moveTaskToList, moveTaskToNewList,
     handleTomorrowClick, handleTodayClick, updateList, setSortBy, startRename, commitRename, deleteList,
-    deleteAllCompleted, addList, toggleCompletedSection, onDragStartTask, onDragStartList, onDragStartAssign,
-    onDragEnd, dropOnList, dropOnTask, dropOnListHeader, dropAssign, promoteToMainTask, indentTask, getTask,
-    fetchTasksForCurrentList, fetchPeople, loadingPeople
+    deleteAllCompleted, addList, toggleCompletedSection, dropAssign, promoteToMainTask, indentTask, getTask,
+    fetchTasksForCurrentList, fetchPeople, loadingPeople,
+    handleListGroupChange, handleTaskGroupChange, onSortEnd, onListSortEnd, makeMutable, unmakeMutable
   };
 };
