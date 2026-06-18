@@ -33,6 +33,7 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       if (typeof window !== "undefined") {
         localStorage.removeItem("token");
+        localStorage.removeItem("fcm_token");
       }
     },
   },
