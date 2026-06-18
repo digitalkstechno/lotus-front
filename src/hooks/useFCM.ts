@@ -28,12 +28,20 @@ export default function useFCM() {
         if (currentToken) {
           console.log("FCM Token:", currentToken);
 
-          // Call the backend API to save the FCM token
-          try {
-            await saveFcmTokenApi(currentToken);
-            console.log("FCM Token saved to backend successfully.");
-          } catch (err) {
-            console.error("Failed to save FCM token to backend", err);
+          // Check if we already saved this token to the backend
+          const savedToken = localStorage.getItem("fcm_token");
+          
+          if (savedToken !== currentToken) {
+            // Call the backend API to save the FCM token and remove the old one
+            try {
+              await saveFcmTokenApi(currentToken, savedToken);
+              localStorage.setItem("fcm_token", currentToken);
+              console.log("FCM Token saved to backend successfully.");
+            } catch (err) {
+              console.error("Failed to save FCM token to backend", err);
+            }
+          } else {
+            console.log("FCM Token is already saved to backend, skipping API call.");
           }
         }
       } catch (error) {

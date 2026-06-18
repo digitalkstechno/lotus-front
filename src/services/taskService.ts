@@ -32,3 +32,8 @@ export const removeTaskAttachmentApi = (id: string, filename: string) => {
   return axiosInstance.put(`/task/${id}/attachment/remove`, { filename });
 };
 
+// PATCH /task/reorder
+export const reorderTasksApi = (tasks: { id: string, order: number }[]) => {
+  return axiosInstance.patch("/task/reorder", tasks);
+};
+

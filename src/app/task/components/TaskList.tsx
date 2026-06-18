@@ -4,13 +4,15 @@ import { useTasks } from "../hooks/useTasks";
 import { SORT_LABELS } from "../lib/constants";
 import { Overlay, MenuItem } from "./Shared";
 import { TaskRow } from "./TaskRow";
+import { ReactSortable } from "react-sortablejs";
 
 export const TaskList = ({ list }: any) => {
   const {
-    closeEditing, dragData, setDragOverTarget, dropOnList, dropOnListHeader,
+    closeEditing, dragData, setDragOverTarget,
     renamingListId, renameValue, setRenameValue, commitRename, openListMenu, setOpenListMenu,
     setSortBy, startRename, addTaskToList, collapsedCompleted, toggleCompletedSection,
-    dragOverTarget, onDragStartList, onDragEnd, fetchTasksForCurrentList
+    dragOverTarget, fetchTasksForCurrentList,
+    handleTaskGroupChange, onSortEnd, makeMutable, unmakeMutable
   } = useTasks();
 
   const pagination = list.taskPagination || { currentPage: 1, hasMore: true, loading: false };
@@ -82,20 +84,10 @@ export const TaskList = ({ list }: any) => {
     <div
       ref={containerRef}
       onClick={closeEditing}
-      onDragOver={(e) => {
-        e.preventDefault();
-        if (dragData.current?.kind === "task") setDragOverTarget({ kind: "list-target", id: list.id });
-      }}
-      onDrop={(e) => dropOnList(e, list.id)}
-      className={`w-[300px] max-h-[calc(100vh-112px)] flex-shrink-0 rounded-xl flex flex-col shadow-sm transition-all ${dragOverTarget?.kind === "list-target" && dragOverTarget.id === list.id ? "ring-2 ring-emerald-500 bg-emerald-50" : "bg-white"}`}
+      className={`w-[300px] max-h-[calc(100vh-112px)] flex-shrink-0 rounded-xl flex flex-col shadow-sm transition-all bg-white`}
     >
       <div
-        draggable
-        onDragStart={(e) => onDragStartList(e, list.id)}
-        onDragEnd={onDragEnd}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => dropOnListHeader(e, list.id)}
-        className="flex items-center gap-2 px-4 py-3 bg-emerald-50 rounded-t-xl cursor-grab active:cursor-grabbing"
+        className="flex items-center gap-2 px-4 py-3 bg-emerald-50 rounded-t-xl list-drag-handle cursor-grab active:cursor-grabbing"
       >
         <GripVertical size={15} className="text-white/50" />
         {renamingListId === list.id ? (
@@ -144,8 +136,23 @@ export const TaskList = ({ list }: any) => {
           {getActiveGroups(list).map((group, gi) => (group.tasks.length > 0 || group.label) && (
             <div key={gi}>
               {group.label && <p className="px-2 pt-2 pb-1 text-[11px] font-semibold text-emerald-600 uppercase tracking-wider">{group.label}</p>}
-              <div className="space-y-1">
-                {group.tasks.map((task: any) => <TaskRow key={task.id} list={list} task={task} parentId={null} />)}
+              {/* Wrapper div carries list/parent context for onSortEnd via closest() */}
+              <div data-list-id={list.id} data-parent-id="">
+                <ReactSortable
+                  list={makeMutable(group.tasks)}
+                  setList={(newTasks) => {
+                     const plainTasks = unmakeMutable(newTasks);
+                     const otherTasks = list.tasks.filter((t: any) => !group.tasks.some((gt: any) => gt.id === t.id));
+                     handleTaskGroupChange(list.id, null, [...plainTasks, ...otherTasks]);
+                  }}
+                  group="shared"
+                  onEnd={onSortEnd}
+                  handle=".task-drag-handle"
+                  animation={150}
+                  className="space-y-1 min-h-[5px]"
+                >
+                  {group.tasks.map((task: any) => <TaskRow key={task.id} list={list} task={task} parentId={null} />)}
+                </ReactSortable>
               </div>
             </div>
           ))}

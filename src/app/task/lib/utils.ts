@@ -27,9 +27,12 @@ export const formatDueLabel = (task: any) => {
     const today = new Date();
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
     
     if (d.toDateString() === today.toDateString()) return "Today";
     if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow";
+    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
     
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -39,17 +42,31 @@ export const formatDueLabel = (task: any) => {
 };
 
 export const formatDate = (dateStr: string) => {
-  if (!dateStr || dateStr === "today" || dateStr === "tomorrow") {
-    return dateStr === "today" ? "Today" : dateStr === "tomorrow" ? "Tomorrow" : null;
+  if (!dateStr || dateStr === "today" || dateStr === "tomorrow" || dateStr === "yesterday") {
+    return dateStr === "today" ? "Today" : dateStr === "tomorrow" ? "Tomorrow" : dateStr === "yesterday" ? "Yesterday" : null;
   }
   const d = new Date(dateStr);
   const today = new Date();
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
   
   if (d.toDateString() === today.toDateString()) return "Today";
   if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow";
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
   
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+};
+
+export const isPastDate = (dateStr: string) => {
+  if (!dateStr) return false;
+  if (dateStr === "today" || dateStr === "tomorrow") return false;
+  if (dateStr === "yesterday") return true;
+  const d = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
+  return d < today;
 };

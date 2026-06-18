@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useTasks } from "./hooks/useTasks";
 import { TaskList } from "./components/TaskList";
 import { CalendarPicker, TimePickerModal, RepeatModal } from "./components/Modals";
+import { ReactSortable } from "react-sortablejs";
 import { fetchListsByUser, resetLists } from "../../redux/slices/listSlice";
 
 function AppContent() {
@@ -23,7 +24,8 @@ function AppContent() {
     lists, addingList, setAddingList, newListName, setNewListName, addList, closeEditing,
     calendarFor, setCalendarFor, calTask, setTimeFor, setRepeatFor, setDueDate, setDueDateAndTime, setTomorrowClickCount,
     editDeadlineFor, setEditDeadlineFor, editTask, clearDue, timeFor, getTask, setDueTime, repeatFor, setRepeat,
-    loadMoreLists, hasMore, loadingLists, setDate
+    loadMoreLists, hasMore, loadingLists, setDate,
+    handleListGroupChange, onListSortEnd, makeMutable, unmakeMutable
   } = useTasks() as any;
 
   console.log("AppContent Rendered - lists from useTasks:", lists);
@@ -61,17 +63,30 @@ function AppContent() {
       </div>
 
       <div className="p-5 flex gap-4 overflow-x-auto items-start min-h-[calc(100vh-72px)]">
-        {lists.map((list: any, index: number) => {
-          if (lists.length === index + 1) {
-            return (
-              <div ref={lastListElementRef} key={list.id} className="flex-shrink-0">
-                <TaskList list={list} />
-              </div>
-            );
-          } else {
-            return <TaskList key={list.id} list={list} />;
-          }
-        })}
+        <ReactSortable
+          list={makeMutable(lists)}
+          setList={(newLists) => handleListGroupChange(unmakeMutable(newLists))}
+          onEnd={onListSortEnd}
+          handle=".list-drag-handle"
+          animation={150}
+          className="flex gap-4 items-start"
+        >
+          {lists.map((list: any, index: number) => {
+            if (lists.length === index + 1) {
+              return (
+                <div ref={lastListElementRef} key={list.id} data-list-id={list.id} className="flex-shrink-0 h-full">
+                  <TaskList list={list} />
+                </div>
+              );
+            } else {
+              return (
+                <div key={list.id} data-list-id={list.id} className="flex-shrink-0 h-full">
+                  <TaskList list={list} />
+                </div>
+              );
+            }
+          })}
+        </ReactSortable>
         {loadingLists && (
           <div className="w-[300px] flex-shrink-0 flex items-center justify-center">
             <span className="text-emerald-500 text-sm font-medium">Loading lists...</span>

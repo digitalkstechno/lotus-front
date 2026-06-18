@@ -1,1 +1,30 @@
 @import "tailwindcss";
+
+/* ── Drag & Drop: Empty subtask drop zone ───────────────────────────────────
+   When ReactSortable is in a drag session, SortableJS adds `.sortable-drag`
+   to the dragged element. We use a sibling selector trick via a body class
+   that SortableJS adds (.sortable-fallback not reliable), so instead we use
+   the [data-parent-id] wrapper to target empty zones during any drag.
+   The .sortable-empty-zone is applied only when subtasks.length === 0.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* Subtle dashed hint — only visible while dragging something near the zone */
+.sortable-empty-zone {
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+/* SortableJS adds .sortable-drag class to the ghost/clone element.
+   We use the :has() approach to highlight empty zones when ANY drag is active */
+body:has(.sortable-drag) .sortable-empty-zone {
+  border: 1.5px dashed #d1fae5;
+  background-color: #f0fdf4;
+  min-height: 28px !important;
+}
+
+/* When hovered over during drag (sortablejs adds .sortable-ghost class to placeholder) */
+.sortable-empty-zone:has(.sortable-ghost),
+.sortable-empty-zone.sortable-over {
+  border: 1.5px dashed #10b981 !important;
+  background-color: #ecfdf5 !important;
+}
