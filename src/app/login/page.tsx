@@ -7,6 +7,7 @@ import { setCredentials } from "../../redux/slices/authSlice";
 import { loginApi } from "../../services/authService";
 import { toast } from "sonner";
 import { Lock, Mail, Eye, EyeOff, MessageCircle } from "lucide-react";
+import { requestAndSaveFCMToken } from "../../hooks/useFCM";
 
 // WhatsApp theme tokens
 // Primary green:   #00A884
@@ -35,6 +36,10 @@ export default function LoginPage() {
         localStorage.setItem("token", response.data.token);
         localStorage.setItem("user", JSON.stringify(response.data.data));
         dispatch(setCredentials({ user: response.data.data, token: response.data.token }));
+        
+        // Immediately request FCM token and save to backend
+        requestAndSaveFCMToken();
+
         const role = response.data.data?.role;
         router.push(role?.toLowerCase() === "admin" ? "/staff" : "/task");
       } else {
