@@ -7,10 +7,14 @@ import { getToken, onMessage } from "firebase/messaging";
 import { messaging } from "@/lib/firebase";
 import { saveFcmTokenApi } from "@/services/userService";
 import { toast } from "sonner";
+import { useSelector } from "react-redux";
 
 export default function useFCM() {
+  const isAuthenticated = useSelector((state: any) => state.auth?.isAuthenticated);
+
   useEffect(() => {
     const generateToken = async () => {
+      if (!isAuthenticated) return;
       try {
         const permission = await Notification.requestPermission();
 
@@ -91,5 +95,5 @@ export default function useFCM() {
         unsubscribe(); // Clean up listener
       };
     }
-  }, []);
+  }, [isAuthenticated]);
 }
