@@ -20,7 +20,7 @@ import { getListsByUserApi, createListApi, updateListApi } from "../services/lis
 
 const PRIMARY_NAV = [
   { id: "task",      label: "Task",       icon: ClipboardList, path: "/task" },
-  { id: "starred",   label: "Starred",    icon: Star,          path: "/" },
+  { id: "starred",   label: "Starred",    icon: Star,          path: "/starred" },
   { id: "checklist", label: "Checklist",  icon: ListChecks,    path: "/checklist" },
   { id: "staff",     label: "Staff",      icon: Users,         path: "/staff" },
   { id: "settings",  label: "Settings",   icon: Settings,      path: "/settings" },
