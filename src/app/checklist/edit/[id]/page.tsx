@@ -110,7 +110,7 @@ function RemarksCell({ value, onChange }) {
 export default function EditRecord() {
   const router = useRouter();
   const params = useParams();
-  const { getRecord, updateRecord } = useChecklist();
+  const { getRecord, updateRecord, master1List } = useChecklist();
 
   const [record, setRecord] = useState(null);
   const [info, setInfoState] = useState(null);
@@ -119,7 +119,11 @@ export default function EditRecord() {
   const [savedMsg, setSavedMsg] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // API thi record fetch karo
+  // master1_id -> { type, order } lookup, built from context's already-fetched /master1 list
+  const master1Map = {};
+  master1List.forEach((m1) => { master1Map[m1._id] = m1; });
+
+
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -127,7 +131,6 @@ export default function EditRecord() {
       if (data) {
         setRecord(data);
 
-        // Info fields set karo
         setInfoState({
           nameOf3PL: data.name_of_3pl || "",
           location: data.location || "",
@@ -140,14 +143,18 @@ export default function EditRecord() {
           periodTo: data.assessment_period?.split(" to ")?.[1] || "",
         });
 
-        // Items set karo — API data thi
+      
         const flatItems = [];
         data.data?.forEach((section) => {
+          const m1Id = section.master1?._id || section.master1;
+          const m1Info = master1Map[m1Id];
           section.data?.forEach((item) => {
             flatItems.push({
               id: item._id,
               master2: item.master2?._id || item.master2,
-              master1: section.master1?._id || section.master1,
+              master1: m1Id,
+              master1Type: section.master1?.type || m1Info?.type || "Section",
+              master1Order: m1Info?.order ?? 0,
               text: item.master2?.particulars || "—",
               cat: item.master2?.category || "—",
               max: item.master2?.max_score || 0,
@@ -157,6 +164,9 @@ export default function EditRecord() {
             });
           });
         });
+
+        flatItems.sort((a, b) => a.master1Order - b.master1Order);
+
         setItems(flatItems);
       }
       setLoading(false);
@@ -203,7 +213,7 @@ export default function EditRecord() {
       ? `${formatDate(info.periodFrom)} to ${formatDate(info.periodTo)}`
       : "—";
 
-  // API payload banavo
+
   function buildPayload() {
     const sectionMap = {};
     items.forEach((it) => {
@@ -249,6 +259,44 @@ export default function EditRecord() {
       alert("Save failed! Please try again.");
     }
   }
+
+  // items already arrive sorted by section order — walk through once and drop in
+
+  const rows = [];
+  let lastSection = undefined;
+  items.forEach((it, i) => {
+    if (it.master1Type !== lastSection) {
+      lastSection = it.master1Type;
+      rows.push(
+        <tr key={`section-${it.master1 || i}`}>
+          <td colSpan={7} className="bg-emerald-50 border-y border-emerald-100 px-4 py-2">
+            <p className="text-xs font-semibold text-emerald-700 tracking-wide">▶ {it.master1Type || "Section"}</p>
+          </td>
+        </tr>
+      );
+    }
+    rows.push(
+      <tr key={it.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50/60"}>
+        <td className="px-2 py-2 text-gray-300 text-[10px]">{i + 1}</td>
+        <td className="px-2 py-2 text-gray-700 leading-snug max-w-[220px]">{it.text}</td>
+        <td className="px-2 py-2 text-center">
+          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${it.cat === "Vital" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
+            {it.cat}
+          </span>
+        </td>
+        <td className="px-2 py-2 text-center text-gray-500">{it.max}</td>
+        <td className="px-2 py-2">
+          <YnCell value={it.yn} onChange={(val) => updateItem(it.id, "yn", val)} />
+        </td>
+        <td className="px-2 py-2 text-center">
+          <ScoreCell value={it.score} max={it.max} onChange={(val) => updateItem(it.id, "score", val)} />
+        </td>
+        <td className="px-2 py-2 max-w-[140px]">
+          <RemarksCell value={it.remarks} onChange={(val) => updateItem(it.id, "remarks", val)} />
+        </td>
+      </tr>
+    );
+  });
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
@@ -305,10 +353,6 @@ export default function EditRecord() {
             </div>
           </div>
 
-          <div className="bg-emerald-50 border-y border-emerald-100 px-4 py-2">
-            <p className="text-xs font-semibold text-emerald-700 tracking-wide">▶ Operations</p>
-          </div>
-
           <div className="overflow-x-auto">
             <table className="w-full text-xs" style={{ minWidth: 680 }}>
               <thead>
@@ -323,27 +367,7 @@ export default function EditRecord() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((it, i) => (
-                  <tr key={it.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50/60"}>
-                    <td className="px-2 py-2 text-gray-300 text-[10px]">{i + 1}</td>
-                    <td className="px-2 py-2 text-gray-700 leading-snug max-w-[220px]">{it.text}</td>
-                    <td className="px-2 py-2 text-center">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${it.cat === "Vital" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
-                        {it.cat}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2 text-center text-gray-500">{it.max}</td>
-                    <td className="px-2 py-2">
-                      <YnCell value={it.yn} onChange={(val) => updateItem(it.id, "yn", val)} />
-                    </td>
-                    <td className="px-2 py-2 text-center">
-                      <ScoreCell value={it.score} max={it.max} onChange={(val) => updateItem(it.id, "score", val)} />
-                    </td>
-                    <td className="px-2 py-2 max-w-[140px]">
-                      <RemarksCell value={it.remarks} onChange={(val) => updateItem(it.id, "remarks", val)} />
-                    </td>
-                  </tr>
-                ))}
+                {rows}
               </tbody>
             </table>
           </div>

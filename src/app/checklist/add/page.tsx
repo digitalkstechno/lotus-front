@@ -64,13 +64,16 @@ function YnCell({ value, onChange }) {
 
 function ScoreCell({ value, max, onChange }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
+  const [draft, setDraft] = useState(value ?? "");
   const inputRef = useRef(null);
 
-  function startEdit() { setDraft(value); setEditing(true); setTimeout(() => { inputRef.current?.focus(); inputRef.current?.select(); }, 0); }
+  function startEdit() { setDraft(value ?? ""); setEditing(true); setTimeout(() => { inputRef.current?.focus(); inputRef.current?.select(); }, 0); }
   function commit() {
-    let s = parseInt(draft); if (isNaN(s)) s = value;
-    s = Math.max(0, Math.min(max, s)); onChange(s); setEditing(false);
+    if (draft === "" || draft === null || draft === undefined) { onChange(null); setEditing(false); return; }
+    let s = parseInt(draft);
+    if (isNaN(s)) { onChange(null); setEditing(false); return; }
+    s = Math.max(0, Math.min(max, s));
+    onChange(s); setEditing(false);
   }
   function onKey(e) { if (e.key === "Enter") commit(); if (e.key === "Escape") setEditing(false); }
 
@@ -80,19 +83,23 @@ function ScoreCell({ value, max, onChange }) {
       className="w-12 text-center text-xs font-semibold text-emerald-700 border-b-2 border-emerald-500 outline-none bg-transparent mx-auto block" />
   ) : (
     <span onClick={startEdit}
-      className="inline-block bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-md text-[11px] cursor-pointer hover:bg-emerald-100 transition-colors"
+      className={`inline-block px-2 py-0.5 rounded-md text-[11px] cursor-pointer transition-colors ${
+        value !== null && value !== undefined
+          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+          : "text-gray-300 italic hover:text-emerald-400"
+      }`}
       title="Click to edit">
-      {value}
+      {value !== null && value !== undefined ? value : "—"}
     </span>
   );
 }
 
 function RemarksCell({ value, onChange }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
+  const [draft, setDraft] = useState(value ?? "");
   const ref = useRef(null);
 
-  function startEdit() { setDraft(value); setEditing(true); setTimeout(() => ref.current?.focus(), 0); }
+  function startEdit() { setDraft(value ?? ""); setEditing(true); setTimeout(() => ref.current?.focus(), 0); }
   function commit() { onChange(draft.trim()); setEditing(false); }
 
   return editing ? (
@@ -101,7 +108,9 @@ function RemarksCell({ value, onChange }) {
       placeholder="Add remarks..." />
   ) : (
     <span onClick={startEdit}
-      className={`text-[10px] cursor-pointer hover:text-emerald-600 transition-colors flex items-start gap-0.5 leading-snug ${value ? "text-gray-500 italic" : "text-gray-300 italic"}`}
+      className={`text-[10px] cursor-pointer hover:text-emerald-600 transition-colors flex items-start gap-0.5 leading-snug ${
+        value ? "text-gray-500 italic" : "text-gray-300 italic"
+      }`}
       title={value || "Click to add remarks"}>
       <span className="line-clamp-2">{value || "—"}</span>
     </span>
@@ -110,9 +119,13 @@ function RemarksCell({ value, onChange }) {
 
 export default function AddChecklist() {
   const router = useRouter();
-  const { items, info, loaded, updateItem, setInfoField, saveRecord } = useChecklist();
+  const { items, info, loaded, updateItem, setInfoField, saveRecord, fetchMasterItems } = useChecklist();
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
+
+  useEffect(() => {
+    fetchMasterItems();
+  }, []);
 
   if (!loaded) {
     return <div className="min-h-screen flex items-center justify-center text-gray-400 text-sm">Loading...</div>;
@@ -148,6 +161,44 @@ export default function AddChecklist() {
     alert("Save failed! Please try again.");
   }
 }
+
+  // items already arrive sorted by master1's real order, then item order within that section —
+  // walk through once and drop in a section header row whenever the section changes
+  const rows = [];
+  let lastSection = undefined;
+  items.forEach((it, i) => {
+    if (it.master1Type !== lastSection) {
+      lastSection = it.master1Type;
+      rows.push(
+        <tr key={`section-${it.master1 || i}`}>
+          <td colSpan={7} className="bg-emerald-50 border-y border-emerald-100 px-4 py-2">
+            <p className="text-xs font-semibold text-emerald-700 tracking-wide">▶ {it.master1Type || "Section"}</p>
+          </td>
+        </tr>
+      );
+    }
+    rows.push(
+      <tr key={it.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50/60"}>
+        <td className="px-2 py-2 text-gray-300 text-[10px]">{i + 1}</td>
+        <td className="px-2 py-2 text-gray-700 leading-snug max-w-[220px]">{it.text}</td>
+        <td className="px-2 py-2 text-center">
+          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${it.cat === "Vital" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
+            {it.cat}
+          </span>
+        </td>
+        <td className="px-2 py-2 text-center text-gray-500">{it.max}</td>
+        <td className="px-2 py-2">
+          <YnCell value={it.yn} onChange={(val) => updateItem(it.id, "yn", val)} />
+        </td>
+        <td className="px-2 py-2 text-center">
+          <ScoreCell value={it.score} max={it.max} onChange={(val) => updateItem(it.id, "score", val)} />
+        </td>
+        <td className="px-2 py-2 max-w-[140px]">
+          <RemarksCell value={it.remarks} onChange={(val) => updateItem(it.id, "remarks", val)} />
+        </td>
+      </tr>
+    );
+  });
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
@@ -204,10 +255,6 @@ export default function AddChecklist() {
             </div>
           </div>
 
-          <div className="bg-emerald-50 border-y border-emerald-100 px-4 py-2">
-            <p className="text-xs font-semibold text-emerald-700 tracking-wide">▶ Operations</p>
-          </div>
-
           <div className="overflow-x-auto">
             <table className="w-full text-xs" style={{ minWidth: 680 }}>
               <thead>
@@ -222,27 +269,7 @@ export default function AddChecklist() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((it, i) => (
-                  <tr key={it.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50/60"}>
-                    <td className="px-2 py-2 text-gray-300 text-[10px]">{i + 1}</td>
-                    <td className="px-2 py-2 text-gray-700 leading-snug max-w-[220px]">{it.text}</td>
-                    <td className="px-2 py-2 text-center">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${it.cat === "Vital" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
-                        {it.cat}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2 text-center text-gray-500">{it.max}</td>
-                    <td className="px-2 py-2">
-                      <YnCell value={it.yn} onChange={(val) => updateItem(it.id, "yn", val)} />
-                    </td>
-                    <td className="px-2 py-2 text-center">
-                      <ScoreCell value={it.score} max={it.max} onChange={(val) => updateItem(it.id, "score", val)} />
-                    </td>
-                    <td className="px-2 py-2 max-w-[140px]">
-                      <RemarksCell value={it.remarks} onChange={(val) => updateItem(it.id, "remarks", val)} />
-                    </td>
-                  </tr>
-                ))}
+                {rows}
               </tbody>
             </table>
           </div>

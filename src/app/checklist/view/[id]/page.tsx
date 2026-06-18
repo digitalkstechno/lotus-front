@@ -8,7 +8,7 @@ import { useState, useEffect } from "react";
 export default function ViewRecord() {
   const router = useRouter();
   const params = useParams();
-  const { getRecord } = useChecklist();
+  const { getRecord, master1List } = useChecklist();
 
   const [record, setRecord] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -38,12 +38,20 @@ export default function ViewRecord() {
     );
   }
 
-  // API data thi flat items banavo
+  // master1_id -> { type, order } lookup, built from context's already-fetched /master1 list
+  const master1Map = {};
+  master1List.forEach((m1) => { master1Map[m1._id] = m1; });
+
+  // API data thi flat items banavo, section (master1) ni info sathe
   const items = [];
   record.data?.forEach((section) => {
+    const m1Id = section.master1?._id || section.master1;
+    const m1Info = master1Map[m1Id];
     section.data?.forEach((item) => {
       items.push({
         id: item._id,
+        master1Type: section.master1?.type || m1Info?.type || "Section",
+        master1Order: m1Info?.order ?? 0,
         text: item.master2?.particulars || "—",
         cat: item.master2?.category || "—",
         max: item.master2?.max_score || 0,
@@ -54,12 +62,14 @@ export default function ViewRecord() {
     });
   });
 
+  // Section ni real order pratimaane sort karo (stable sort)
+  items.sort((a, b) => a.master1Order - b.master1Order);
+
   const totalScore = record.total ?? 0;
   const maxScore = items.reduce((s, it) => s + it.max, 0);
   const yesCount = items.filter((it) => it.yn === "Yes").length;
 
   // Period parse karo
-  const periodParts = record.assessment_period?.split(" to ") || [];
   const periodStr = record.assessment_period || "—";
 
   const displayVal = (val, fallback = "—") => val?.trim() || fallback;
@@ -73,6 +83,46 @@ export default function ViewRecord() {
       return `${dd}-${mm}-${yy}`;
     } catch { return d; }
   };
+
+  // items already sorted by section order — walk through once and drop in
+  // a section header row whenever the section (master1Type) changes
+  const rows = [];
+  let lastSection = undefined;
+  items.forEach((it, i) => {
+    if (it.master1Type !== lastSection) {
+      lastSection = it.master1Type;
+      rows.push(
+        <tr key={`section-${it.master1Type || i}`}>
+          <td colSpan={7} className="bg-emerald-50 border-y border-emerald-100 px-4 py-2">
+            <p className="text-xs font-semibold text-emerald-700 tracking-wide">▶ {it.master1Type || "Section"}</p>
+          </td>
+        </tr>
+      );
+    }
+    rows.push(
+      <tr key={it.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50/60"}>
+        <td className="px-2 py-2 text-gray-300 text-[10px]">{i + 1}</td>
+        <td className="px-2 py-2 text-gray-700 leading-snug max-w-[220px]">{it.text}</td>
+        <td className="px-2 py-2 text-center">
+          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${it.cat === "Vital" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
+            {it.cat}
+          </span>
+        </td>
+        <td className="px-2 py-2 text-center text-gray-500">{it.max}</td>
+        <td className="px-2 py-2 text-center">
+          <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold ${it.yn === "Yes" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+            {it.yn}
+          </span>
+        </td>
+        <td className="px-2 py-2 text-center">
+          <span className="inline-block bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-md text-[11px]">
+            {it.score}
+          </span>
+        </td>
+        <td className="px-2 py-2 text-[10px] text-gray-500 max-w-[140px]">{it.remarks || "—"}</td>
+      </tr>
+    );
+  });
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
@@ -115,10 +165,6 @@ export default function ViewRecord() {
             ))}
           </div>
 
-          <div className="bg-emerald-50 border-y border-emerald-100 px-4 py-2">
-            <p className="text-xs font-semibold text-emerald-700 tracking-wide">▶ Operations</p>
-          </div>
-
           <div className="overflow-x-auto">
             <table className="w-full text-xs" style={{ minWidth: 680 }}>
               <thead>
@@ -133,29 +179,7 @@ export default function ViewRecord() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((it, i) => (
-                  <tr key={it.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50/60"}>
-                    <td className="px-2 py-2 text-gray-300 text-[10px]">{i + 1}</td>
-                    <td className="px-2 py-2 text-gray-700 leading-snug max-w-[220px]">{it.text}</td>
-                    <td className="px-2 py-2 text-center">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${it.cat === "Vital" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
-                        {it.cat}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2 text-center text-gray-500">{it.max}</td>
-                    <td className="px-2 py-2 text-center">
-                      <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold ${it.yn === "Yes" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
-                        {it.yn}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2 text-center">
-                      <span className="inline-block bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-md text-[11px]">
-                        {it.score}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2 text-[10px] text-gray-500 max-w-[140px]">{it.remarks || "—"}</td>
-                  </tr>
-                ))}
+                {rows}
                 {items.length === 0 && (
                   <tr>
                     <td colSpan={7} className="text-center text-gray-400 py-8">No items found.</td>

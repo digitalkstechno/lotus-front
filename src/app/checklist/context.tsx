@@ -21,6 +21,7 @@ export function ChecklistProvider({ children }) {
   const [items, setItems] = useState([]);       
   const [info, setInfo] = useState(INITIAL_INFO);
   const [records, setRecords] = useState([]);
+  const [master1List, setMaster1List] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [fetchingRecords, setFetchingRecords] = useState(false);
@@ -50,47 +51,47 @@ export function ChecklistProvider({ children }) {
     }
   }
 
-  // Master2 items fetch on mount
-  useEffect(() => {
-    async function fetchMaster2() {
+  async function fetchMasterItems() {
       try {
         if(typeof window !== "undefined" && localStorage.getItem("token")){
-
-          const res = await axiosInstance.get("/master2");
-          const data = res.data?.data || [];
-  
-          // API response ne frontend format ma convert karo
-          const mapped = data.map((item) => ({
-            id: item._id,
-            master2: item._id,
-            master1: item.master1_id?._id,
-            master1Type: item.master1_id?.type,
-            text: item.particulars,
-            cat: item.category,
-            max: item.max_score,
-            yn: "Yes",
-            score: item.max_score, // default max score
-            remarks: "",
-            order: item.order,
-          }));
-  
-          // Order by section type then order field
-          mapped.sort((a, b) => {
-            if (a.master1Type < b.master1Type) return -1;
-            if (a.master1Type > b.master1Type) return 1;
-            return a.order - b.order;
+          const master1Res = await axiosInstance.get("/master1");
+          const master1Data = master1Res.data?.data || [];
+          setMaster1List(master1Data);
+          const sortedMaster1 = [...master1Data].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+          const master2Results = await Promise.all(
+            sortedMaster1.map((m1) => axiosInstance.get(`/master2/master1/${m1._id}`))
+          );
+          const allMapped = [];
+          sortedMaster1.forEach((m1, idx) => {
+            const data = master2Results[idx]?.data?.data || [];
+            const mapped = data.map((item) => ({
+              id: item._id,
+              master2: item._id,
+              master1: item.master1_id?._id || m1._id,
+              master1Type: item.master1_id?.type || m1.type,
+              master1Order: m1.order,
+              text: item.particulars,
+              cat: item.category,
+              max: item.max_score,
+              yn: "Yes",
+              score: null,
+              remarks: "",
+              order: item.order,
+            }));
+            allMapped.push(...mapped);
           });
-  
-          setItems(mapped);
+          setItems(allMapped);
         }
       } catch (e) {
-        console.error("Failed to fetch master2 items", e);
+        console.error("Failed to fetch master1/master2 items", e);
       } finally {
         setLoaded(true);
       }
-    }
+  }
 
-    fetchMaster2();
+  // Master1 (sections) + Master2 (checklist items, fetched per section) on mount
+  useEffect(() => {
+    fetchMasterItems();
     fetchRecordsList();
   }, []);
 
@@ -120,7 +121,6 @@ export function ChecklistProvider({ children }) {
     return (val) => setInfo((p) => ({ ...p, [key]: val }));
   }
 
-  // Items ne master1 wise group karo — payload banava mate
   function buildPayload() {
     // master1 wise group
     const sectionMap = {};
@@ -171,6 +171,7 @@ export function ChecklistProvider({ children }) {
     const newRecord = res.data?.data || res.data;
     await fetchRecordsList();
     setInfo(INITIAL_INFO);
+    resetItems(); // clear previous yn/score/remarks back to defaults
     return { success: true, data: newRecord };
   } catch (e) {
     console.error("Save error:", e);
@@ -184,7 +185,7 @@ export function ChecklistProvider({ children }) {
   // Reset items to default scores
   function resetItems() {
     setItems((prev) =>
-      prev.map((it) => ({ ...it, yn: "Yes", score: it.max, remarks: "" }))
+      prev.map((it) => ({ ...it, yn: "Yes", score: null, remarks: "" }))
     );
   }
 
@@ -194,6 +195,7 @@ export function ChecklistProvider({ children }) {
         items,
         info,
         records,
+        master1List,
         loaded,
         saving,
         fetchingRecords,
@@ -202,6 +204,7 @@ export function ChecklistProvider({ children }) {
         setInfo,
         saveRecord,
         fetchRecordsList,
+        fetchMasterItems,
         resetItems, getRecord, updateRecord,
       }}
     >
