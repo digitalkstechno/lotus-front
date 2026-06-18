@@ -56,7 +56,7 @@ export default function ViewRecord() {
         text: item.master2?.particulars || "—",
         cat: item.master2?.category || "—",
         max: item.master2?.max_score || 0,
-        yn: item.isRequired ? "Yes" : "No",
+        yn: item.yn || (item.isRequired ? "Yes" : "No"),
         score: item.score,
         remarks: item.remarks || "",
       });
@@ -67,7 +67,7 @@ export default function ViewRecord() {
   items.sort((a, b) => a.master1Order - b.master1Order);
 
   const totalScore = record.total ?? 0;
-  const maxScore = items.reduce((s, it) => s + it.max, 0);
+  const maxScore = items.reduce((s, it) => it.yn !== "NA" ? s + (Number(it.max) || 0) : s, 0);
   const yesCount = items.filter((it) => it.yn === "Yes").length;
 
   // Period parse karo
@@ -113,8 +113,10 @@ export default function ViewRecord() {
 
     // Items
     group.items.forEach((it, i) => {
-      sectionMax += Number(it.max) || 0;
-      sectionScore += Number(it.score) || 0;
+      if (it.yn !== "NA") {
+        sectionMax += Number(it.max) || 0;
+        sectionScore += Number(it.score) || 0;
+      }
 
       rows.push(
         <tr key={it.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50/60"}>
@@ -127,7 +129,7 @@ export default function ViewRecord() {
           </td>
           <td className="px-2 py-2 text-center text-gray-500">{it.max}</td>
           <td className="px-2 py-2 text-center">
-            <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold ${it.yn === "Yes" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+            <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold ${it.yn === "Yes" ? "bg-emerald-100 text-emerald-700" : it.yn === "No" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"}`}>
               {it.yn}
             </span>
           </td>

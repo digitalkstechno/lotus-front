@@ -44,16 +44,25 @@ function YnCell({ value, onChange }) {
 
   return (
     <div className="relative flex justify-center" ref={ref}>
-      <button onClick={() => setOpen((p) => !p)}
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold cursor-pointer transition-all hover:opacity-80 ${value === "Yes" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
-        {value}<span className="text-[8px] opacity-60">▾</span>
+      <button
+        onClick={() => setOpen((p) => !p)}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold cursor-pointer transition-all hover:opacity-80 ${value === "Yes" ? "bg-emerald-100 text-emerald-700" : value === "No" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"}`}
+      >
+        {value}
+        <span className="text-[8px] opacity-60">▾</span>
       </button>
       {open && (
         <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-xl shadow-lg z-30 overflow-hidden min-w-[90px]">
-          {["Yes", "No"].map((opt) => (
-            <button key={opt} onClick={() => { onChange(opt); setOpen(false); }}
-              className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-gray-50 transition-colors ${opt === value ? "text-emerald-600 bg-emerald-50" : "text-gray-700"}`}>
-              {opt === "Yes" ? "✓ Yes" : "✗ No"}
+          {["Yes", "No", "NA"].map((opt) => (
+            <button
+              key={opt}
+              onClick={() => {
+                onChange(opt);
+                setOpen(false);
+              }}
+              className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-gray-50 transition-colors ${opt === value ? "text-emerald-600 bg-emerald-50" : "text-gray-700"}`}
+            >
+              {opt === "Yes" ? "✓ Yes" : opt === "No" ? "✗ No" : "— NA"}
             </button>
           ))}
         </div>
@@ -62,33 +71,58 @@ function YnCell({ value, onChange }) {
   );
 }
 
-function ScoreCell({ value, max, onChange }) {
+function ScoreCell({ value, max, onChange, disabled }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? "");
   const inputRef = useRef(null);
 
-  function startEdit() { setDraft(value ?? ""); setEditing(true); setTimeout(() => { inputRef.current?.focus(); inputRef.current?.select(); }, 0); }
+  function startEdit() {
+    if (disabled) return;
+    setDraft(value ?? "");
+    setEditing(true);
+    setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 0);
+  }
   function commit() {
     if (draft === "" || draft === null || draft === undefined) { onChange(null); setEditing(false); return; }
     let s = parseInt(draft);
     if (isNaN(s)) { onChange(null); setEditing(false); return; }
     s = Math.max(0, Math.min(max, s));
-    onChange(s); setEditing(false);
+    onChange(s);
+    setEditing(false);
   }
-  function onKey(e) { if (e.key === "Enter") commit(); if (e.key === "Escape") setEditing(false); }
+  function onKey(e) {
+    if (e.key === "Enter") commit();
+    if (e.key === "Escape") setEditing(false);
+  }
 
   return editing ? (
-    <input ref={inputRef} type="number" min={0} max={max} value={draft}
-      onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={onKey}
-      className="w-12 text-center text-xs font-semibold text-emerald-700 border-b-2 border-emerald-500 outline-none bg-transparent mx-auto block" />
+    <input
+      ref={inputRef}
+      type="number"
+      min={0}
+      max={max}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={onKey}
+      disabled={disabled}
+      className="w-12 text-center text-xs font-semibold text-emerald-700 border-b-2 border-emerald-500 outline-none bg-transparent mx-auto block"
+    />
   ) : (
-    <span onClick={startEdit}
-      className={`inline-block px-2 py-0.5 rounded-md text-[11px] cursor-pointer transition-colors ${
-        value !== null && value !== undefined
-          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-          : "text-gray-300 italic hover:text-emerald-400"
+    <span
+      onClick={startEdit}
+      className={`inline-block px-2 py-0.5 rounded-md text-[11px] transition-colors ${
+        disabled 
+          ? "bg-gray-50 text-gray-400 cursor-not-allowed opacity-60" 
+          : value !== null && value !== undefined
+            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 cursor-pointer"
+            : "text-gray-300 italic hover:text-emerald-400 cursor-pointer"
       }`}
-      title="Click to edit">
+      title={disabled ? "Score disabled" : "Click to edit"}
+    >
       {value !== null && value !== undefined ? value : "—"}
     </span>
   );
@@ -119,7 +153,8 @@ function RemarksCell({ value, onChange }) {
 
 export default function AddChecklist() {
   const router = useRouter();
-  const { items, info, loaded, updateItem, setInfoField, saveRecord, fetchMasterItems, master1List } = useChecklist();
+  const { items, info, loaded, updateItem, setInfoField, saveRecord, master1List, fetchMasterItems } =
+    useChecklist();
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
 
@@ -131,9 +166,9 @@ export default function AddChecklist() {
     return <div className="min-h-screen flex items-center justify-center text-gray-400 text-sm">Loading...</div>;
   }
 
-  const totalScore = items.reduce((s, it) => s + it.score, 0);
-  const maxScore   = items.reduce((s, it) => s + it.max,   0);
-  const yesCount   = items.filter((it) => it.yn === "Yes").length;
+  const totalScore = items.reduce((s, it) => it.yn !== "NA" ? s + (Number(it.score) || 0) : s, 0);
+  const maxScore = items.reduce((s, it) => it.yn !== "NA" ? s + (Number(it.max) || 0) : s, 0);
+  const yesCount = items.filter((it) => it.yn === "Yes").length;
 
   const displayVal = (val, fallback = "—") => val?.trim() || fallback;
   const formatDate = (d) => {
@@ -195,8 +230,10 @@ export default function AddChecklist() {
 
     // Items
     group.items.forEach((it, i) => {
-      sectionMax += Number(it.max) || 0;
-      sectionScore += Number(it.score) || 0;
+      if (it.yn !== "NA") {
+        sectionMax += Number(it.max) || 0;
+        sectionScore += Number(it.score) || 0;
+      }
 
       rows.push(
         <tr key={it.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50/60"}>
@@ -209,10 +246,18 @@ export default function AddChecklist() {
           </td>
           <td className="px-2 py-2 text-center text-gray-500">{it.max}</td>
           <td className="px-2 py-2">
-            <YnCell value={it.yn} onChange={(val) => updateItem(it.id, "yn", val)} />
+            <YnCell 
+              value={it.yn} 
+              onChange={(val) => {
+                updateItem(it.id, "yn", val);
+                if (val === "No") {
+                  updateItem(it.id, "score", 0);
+                }
+              }} 
+            />
           </td>
           <td className="px-2 py-2 text-center">
-            <ScoreCell value={it.score} max={it.max} onChange={(val) => updateItem(it.id, "score", val)} />
+            <ScoreCell disabled={it.yn === "No" || it.yn === "NA"} value={it.score} max={it.max} onChange={(val) => updateItem(it.id, "score", val)} />
           </td>
           <td className="px-2 py-2 max-w-[140px]">
             <RemarksCell value={it.remarks} onChange={(val) => updateItem(it.id, "remarks", val)} />

@@ -131,8 +131,9 @@ export function ChecklistProvider({ children }) {
       }
       sectionMap[it.master1].push({
         master2: it.master2,
-        score: it.score,
+        score: it.score ?? 0,
         isRequired: it.yn === "Yes",
+        yn: it.yn,
         remarks: it.remarks,
       });
     });
