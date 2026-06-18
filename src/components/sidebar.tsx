@@ -17,6 +17,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { getListsByUserApi, createListApi, updateListApi } from "../services/listService";
+import { logoutApi } from "../services/userService";
 
 const PRIMARY_NAV = [
   { id: "task",      label: "Task",       icon: ClipboardList, path: "/task" },
@@ -108,7 +109,16 @@ export default function Sidebar() {
     return () => { cancelled = true; };
   }, [pathname]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      const fcmToken = localStorage.getItem("fcm_token");
+      if (fcmToken) {
+        await logoutApi(fcmToken);
+      }
+    } catch (e) {
+      console.error("Failed to call logout API", e);
+    }
+    
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("fcm_token");
