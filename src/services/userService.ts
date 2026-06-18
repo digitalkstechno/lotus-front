@@ -34,3 +34,8 @@ export const searchUsersApi = (query: string) => {
 export const saveFcmTokenApi = (fcmToken: string, oldFcmToken?: string | null) => {
   return axiosInstance.post(`/user/save-fcm`, { fcmToken, oldFcmToken });
 };
+
+// POST /user/logout
+export const logoutApi = (fcmToken?: string | null) => {
+  return axiosInstance.post(`/user/logout`, { fcmToken });
+};
