@@ -42,13 +42,11 @@ export default function UnifiedMastersPage() {
     }, [master2State.items]);
 
     const toggleExpand = (id: string) => {
-        setExpanded(prev => {
-            const isExpanding = !prev[id];
-            if (isExpanding) {
-                dispatch(fetchMaster2ByMaster1(id));
-            }
-            return { ...prev, [id]: isExpanding };
-        });
+        const isCurrentlyExpanded = expanded[id];
+        if (!isCurrentlyExpanded) {
+            dispatch(fetchMaster2ByMaster1(id));
+        }
+        setExpanded(prev => ({ ...prev, [id]: !isCurrentlyExpanded }));
     };
 
     // ----- DRAWER STATES -----

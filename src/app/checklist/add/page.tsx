@@ -73,14 +73,14 @@ function YnCell({ value, onChange }) {
     <div className="relative flex justify-center" ref={ref}>
       <button
         onClick={() => setOpen((p) => !p)}
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold cursor-pointer transition-all hover:opacity-80 ${value === "Yes" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold cursor-pointer transition-all hover:opacity-80 ${value === "Yes" ? "bg-emerald-100 text-emerald-700" : value === "No" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"}`}
       >
         {value}
         <span className="text-[8px] opacity-60">▾</span>
       </button>
       {open && (
         <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-xl shadow-lg z-30 overflow-hidden min-w-[90px]">
-          {["Yes", "No"].map((opt) => (
+          {["Yes", "No", "NA"].map((opt) => (
             <button
               key={opt}
               onClick={() => {
@@ -89,7 +89,7 @@ function YnCell({ value, onChange }) {
               }}
               className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-gray-50 transition-colors ${opt === value ? "text-emerald-600 bg-emerald-50" : "text-gray-700"}`}
             >
-              {opt === "Yes" ? "✓ Yes" : "✗ No"}
+              {opt === "Yes" ? "✓ Yes" : opt === "No" ? "✗ No" : "— NA"}
             </button>
           ))}
         </div>
@@ -98,13 +98,14 @@ function YnCell({ value, onChange }) {
   );
 }
 
-function ScoreCell({ value, max, onChange }) {
+function ScoreCell({ value, max, onChange, disabled }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
+  const [draft, setDraft] = useState(value ?? "");
   const inputRef = useRef(null);
 
   function startEdit() {
-    setDraft(value);
+    if (disabled) return;
+    setDraft(value ?? "");
     setEditing(true);
     setTimeout(() => {
       inputRef.current?.focus();
@@ -112,8 +113,9 @@ function ScoreCell({ value, max, onChange }) {
     }, 0);
   }
   function commit() {
+    if (draft === "" || draft === null || draft === undefined) { onChange(null); setEditing(false); return; }
     let s = parseInt(draft);
-    if (isNaN(s)) s = value;
+    if (isNaN(s)) { onChange(null); setEditing(false); return; }
     s = Math.max(0, Math.min(max, s));
     onChange(s);
     setEditing(false);
@@ -133,33 +135,33 @@ function ScoreCell({ value, max, onChange }) {
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
       onKeyDown={onKey}
+      disabled={disabled}
       className="w-12 text-center text-xs font-semibold text-emerald-700 border-b-2 border-emerald-500 outline-none bg-transparent mx-auto block"
     />
   ) : (
     <span
       onClick={startEdit}
-      className="inline-block bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-md text-[11px] cursor-pointer hover:bg-emerald-100 transition-colors"
-      title="Click to edit"
+      className={`inline-block px-2 py-0.5 rounded-md text-[11px] transition-colors ${
+        disabled 
+          ? "bg-gray-50 text-gray-400 cursor-not-allowed opacity-60" 
+          : value !== null && value !== undefined
+            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 cursor-pointer"
+            : "text-gray-300 italic hover:text-emerald-400 cursor-pointer"
+      }`}
+      title={disabled ? "Score disabled" : "Click to edit"}
     >
-      {value}
+      {value !== null && value !== undefined ? value : "—"}
     </span>
   );
 }
 
 function RemarksCell({ value, onChange }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
+  const [draft, setDraft] = useState(value ?? "");
   const ref = useRef(null);
 
-  function startEdit() {
-    setDraft(value);
-    setEditing(true);
-    setTimeout(() => ref.current?.focus(), 0);
-  }
-  function commit() {
-    onChange(draft.trim());
-    setEditing(false);
-  }
+  function startEdit() { setDraft(value ?? ""); setEditing(true); setTimeout(() => ref.current?.focus(), 0); }
+  function commit() { onChange(draft.trim()); setEditing(false); }
 
   return editing ? (
     <textarea
@@ -172,11 +174,11 @@ function RemarksCell({ value, onChange }) {
       placeholder="Add remarks..."
     />
   ) : (
-    <span
-      onClick={startEdit}
-      className={`text-[10px] cursor-pointer hover:text-emerald-600 transition-colors flex items-start gap-0.5 leading-snug ${value ? "text-gray-500 italic" : "text-gray-300 italic"}`}
-      title={value || "Click to add remarks"}
-    >
+    <span onClick={startEdit}
+      className={`text-[10px] cursor-pointer hover:text-emerald-600 transition-colors flex items-start gap-0.5 leading-snug ${
+        value ? "text-gray-500 italic" : "text-gray-300 italic"
+      }`}
+      title={value || "Click to add remarks"}>
       <span className="line-clamp-2">{value || "—"}</span>
     </span>
   );
@@ -184,10 +186,14 @@ function RemarksCell({ value, onChange }) {
 
 export default function AddChecklist() {
   const router = useRouter();
-  const { items, info, loaded, updateItem, setInfoField, saveRecord } =
+  const { items, info, loaded, updateItem, setInfoField, saveRecord, master1List, fetchMasterItems } =
     useChecklist();
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
+
+  useEffect(() => {
+    fetchMasterItems();
+  }, []);
 
   if (!loaded) {
     return (
@@ -197,8 +203,8 @@ export default function AddChecklist() {
     );
   }
 
-  const totalScore = items.reduce((s, it) => s + it.score, 0);
-  const maxScore = items.reduce((s, it) => s + it.max, 0);
+  const totalScore = items.reduce((s, it) => it.yn !== "NA" ? s + (Number(it.score) || 0) : s, 0);
+  const maxScore = items.reduce((s, it) => it.yn !== "NA" ? s + (Number(it.max) || 0) : s, 0);
   const yesCount = items.filter((it) => it.yn === "Yes").length;
 
   const displayVal = (val, fallback = "—") => val?.trim() || fallback;
@@ -227,6 +233,101 @@ export default function AddChecklist() {
       alert("Save failed! Please try again.");
     }
   }
+
+  const master1Map = {};
+  if (master1List) {
+    master1List.forEach((m1) => { master1Map[m1._id] = m1; });
+  }
+
+  // Group items by master1
+  const sectionGroups = [];
+  items.forEach((it) => {
+    let group = sectionGroups.find((g) => g.master1 === it.master1);
+    if (!group) {
+      group = { master1: it.master1, master1Type: it.master1Type, items: [] };
+      sectionGroups.push(group);
+    }
+    group.items.push(it);
+  });
+
+  const rows = [];
+  let index = 1;
+  sectionGroups.forEach((group) => {
+    // Header
+    rows.push(
+      <tr key={`section-${group.master1 || group.master1Type}`}>
+        <td colSpan={7} className="bg-emerald-50 border-y border-emerald-100 px-4 py-2">
+          <p className="text-xs font-semibold text-emerald-700 tracking-wide">▶ {group.master1Type || "Section"}</p>
+        </td>
+      </tr>
+    );
+
+    let sectionMax = 0;
+    let sectionScore = 0;
+
+    // Items
+    group.items.forEach((it, i) => {
+      if (it.yn !== "NA") {
+        sectionMax += Number(it.max) || 0;
+        sectionScore += Number(it.score) || 0;
+      }
+
+      rows.push(
+        <tr key={it.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50/60"}>
+          <td className="px-2 py-2 text-gray-300 text-[10px]">{index}</td>
+          <td className="px-2 py-2 text-gray-700 leading-snug max-w-[220px]">{it.text}</td>
+          <td className="px-2 py-2 text-center">
+            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${it.cat === "Vital" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
+              {it.cat}
+            </span>
+          </td>
+          <td className="px-2 py-2 text-center text-gray-500">{it.max}</td>
+          <td className="px-2 py-2">
+            <YnCell 
+              value={it.yn} 
+              onChange={(val) => {
+                updateItem(it.id, "yn", val);
+                if (val === "No") {
+                  updateItem(it.id, "score", 0);
+                }
+              }} 
+            />
+          </td>
+          <td className="px-2 py-2 text-center">
+            <ScoreCell disabled={it.yn === "No" || it.yn === "NA"} value={it.score} max={it.max} onChange={(val) => updateItem(it.id, "score", val)} />
+          </td>
+          <td className="px-2 py-2 max-w-[140px]">
+            <RemarksCell value={it.remarks} onChange={(val) => updateItem(it.id, "remarks", val)} />
+          </td>
+        </tr>
+      );
+      index++;
+    });
+
+    // Footer with Weighted Average
+    const m1Info = master1Map[group.master1] || {};
+    const weight = Number(m1Info.weight) || 0;
+    const weightedAvg = sectionMax > 0 ? ((weight * sectionScore) / sectionMax).toFixed(2) : "0.00";
+
+    rows.push(
+      <tr key={`footer-${group.master1 || group.master1Type}`} className="bg-emerald-50/50 border-y border-emerald-100">
+        <td colSpan={2} className="px-4 py-2 text-xs font-semibold text-gray-700 text-right">
+          Weighted Average = {weight}
+        </td>
+        <td className="px-2 py-2 text-center text-xs font-bold text-emerald-700">
+          {weightedAvg}
+        </td>
+        <td className="px-2 py-2 text-center text-xs font-bold text-gray-600">
+          {sectionMax}
+        </td>
+        <td className="px-2 py-2 text-center text-xs"></td>
+        <td className="px-2 py-2 text-center text-xs font-bold text-gray-600">
+          {sectionScore}
+        </td>
+        <td className="px-2 py-2 text-center text-xs"></td>
+      </tr>
+    );
+  });
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
@@ -341,12 +442,6 @@ export default function AddChecklist() {
             </div>
           </div>
 
-          <div className="bg-emerald-50 border-y border-emerald-100 px-4 py-2">
-            <p className="text-xs font-semibold text-emerald-700 tracking-wide">
-              ▶ Operations
-            </p>
-          </div>
-
           <div className="overflow-x-auto">
             <table className="w-full text-xs" style={{ minWidth: 680 }}>
               <thead>
@@ -375,65 +470,16 @@ export default function AddChecklist() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((it, i) => (
-                  <tr
-                    key={it.id}
-                    className={i % 2 === 0 ? "bg-white" : "bg-gray-50/60"}
-                  >
-                    <td className="px-2 py-2 text-gray-300 text-[10px]">
-                      {i + 1}
-                    </td>
-                    <td className="px-2 py-2 text-gray-700 leading-snug max-w-[220px]">
-                      {it.text}
-                    </td>
-                    <td className="px-2 py-2 text-center">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${it.cat === "Vital" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}
-                      >
-                        {it.cat}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2 text-center text-gray-500">
-                      {it.max}
-                    </td>
-                    <td className="px-2 py-2">
-                      <YnCell
-                        value={it.yn}
-                        onChange={(val) => {
-                          updateItem(it.id, "yn", val);
-                          if (val === "No") {
-                            updateItem(it.id, "score", 0);
-                          }
-                        }}
-                      />
-                    </td>
-                    <td className="px-2 py-2 text-center">
-                      <ScoreCell
-                        value={it.score}
-                        max={it.max}
-                        onChange={(val) => updateItem(it.id, "score", val)}
-                      />
-                    </td>
-                    <td className="px-2 py-2 max-w-[140px]">
-                      <RemarksCell
-                        value={it.remarks}
-                        onChange={(val) => updateItem(it.id, "remarks", val)}
-                      />
-                    </td>
-                  </tr>
-                ))}
+                {rows}
               </tbody>
             </table>
           </div>
 
-          <div className="bg-gray-50 border-t border-gray-100 px-4 py-3 flex items-center justify-between flex-wrap gap-3">
-            <p className="text-xs font-semibold text-gray-500">
-              Weighted Average = 30
-            </p>
+          <div className="bg-gray-50 border-t border-gray-100 px-4 py-3 flex items-center justify-end flex-wrap gap-3">
             <div className="flex gap-5">
               <div className="text-center">
                 <p className="text-lg font-bold text-emerald-700">{maxScore}</p>
-                <p className="text-[10px] text-gray-400">Max Score</p>
+                <p className="text-[10px] text-gray-400">Total Max Score</p>
               </div>
               <div className="text-center">
                 <p className="text-lg font-bold text-emerald-500">{yesCount}</p>

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import FCMProvider from "@/components/FCMProvider";
 import Sidebar from "../components/sidebar";
+import AuthGuard from "@/components/AuthGuard";
 import { ChecklistProvider } from "./checklist/context";
 import ReduxProvider from "@/redux/ReduxProvider";
 import { Toaster } from "sonner";
@@ -31,15 +32,17 @@ export default function RootLayout({
     <html lang="en">
       <body className="flex h-screen overflow-hidden">
         <ReduxProvider>
-          <Sidebar />
-          <main className="flex-1 overflow-y-auto">
-             <FCMProvider>
-            <ChecklistProvider>
-              {children}
-              <Toaster position="top-right" richColors />
-            </ChecklistProvider>
-             </FCMProvider>
-          </main>
+          <AuthGuard>
+            <Sidebar />
+            <main className="flex-1 overflow-y-auto">
+               <FCMProvider>
+              <ChecklistProvider>
+                {children}
+                <Toaster position="top-right" richColors />
+              </ChecklistProvider>
+               </FCMProvider>
+            </main>
+          </AuthGuard>
         </ReduxProvider>
       </body>
     </html>

@@ -5,6 +5,12 @@ export const getTasksByListAndUserApi = (listId: string, userId: string, page = 
   return axiosInstance.get(`/task/list/${listId}/user/${userId}`, { params: { page, limit, sortBy } });
 };
 
+// GET /task/starred/user/:user_id  — paginated starred tasks for the logged-in user
+export const getStarredTasksByUserApi = (userId: string, page = 1, limit = 20) => {
+  return axiosInstance.get(`/task/starred/user/${userId}`, { params: { page, limit } });
+};
+
+
 // POST /task/create
 export const createTaskApi = (data: any) => {
   return axiosInstance.post("/task/create", data);
@@ -30,5 +36,10 @@ export const uploadTaskFilesApi = (id: string, formData: FormData) => {
 // PUT /task/:id/attachment/remove
 export const removeTaskAttachmentApi = (id: string, filename: string) => {
   return axiosInstance.put(`/task/${id}/attachment/remove`, { filename });
+};
+
+// PATCH /task/reorder
+export const reorderTasksApi = (tasks: { id: string, order: number }[]) => {
+  return axiosInstance.patch("/task/reorder", tasks);
 };
 

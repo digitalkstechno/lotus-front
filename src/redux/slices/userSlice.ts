@@ -23,7 +23,7 @@ export const addUser = createAsyncThunk("users/add", async (data: any, { rejectW
     };
     const response = await userApi.addUserApi(payload);
     const u = response.data.data || response.data;
-    return { ...u, id: u._id || u.id, name: u.fullName || u.name, designation: u.role || u.designation || "Staff" };
+    return { ...u, id: u._id || u.id, name: u.fullName || u.name, designation: (u.role || u.designation || "staff").toLowerCase(), phone: String(u.contactNo || u.phone || data.phone || "") };
   } catch (err: any) {
     return rejectWithValue(err.response?.data || "Failed to add user");
   }
@@ -41,7 +41,7 @@ export const updateUser = createAsyncThunk("users/update", async ({ id, data }: 
     };
     const response = await userApi.updateUserApi(id, payload);
     const u = response.data.data || response.data;
-    return { ...u, id: u._id || u.id, name: u.fullName || u.name, designation: u.role || u.designation || "Staff", unitId: typeof u.unit_id === "object" ? u.unit_id?._id : u.unit_id, teamId: typeof u.team_id === "object" ? u.team_id?._id : u.team_id };
+    return { ...u, id: u._id || u.id, name: u.fullName || u.name, designation: (u.role || u.designation || "staff").toLowerCase(), phone: String(u.contactNo || u.phone || data.phone || ""), unitId: typeof u.unit_id === "object" ? u.unit_id?._id : u.unit_id, teamId: typeof u.team_id === "object" ? u.team_id?._id : u.team_id };
   } catch (err: any) {
     return rejectWithValue(err.response?.data || "Failed to update user");
   }
@@ -79,7 +79,8 @@ const userSlice = createSlice({
         ...u,
         id: u._id || u.id,
         name: u.fullName || u.name || "Unknown",
-        designation: u.role || u.designation || "Staff",
+        designation: (u.role || u.designation || "staff").toLowerCase(),
+        phone: String(u.contactNo || u.phone || ""),
         unitId: typeof u.unit_id === "object" ? u.unit_id?._id : u.unit_id,
         teamId: typeof u.team_id === "object" ? u.team_id?._id : u.team_id
       })) : [];
