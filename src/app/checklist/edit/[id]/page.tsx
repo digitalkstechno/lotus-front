@@ -260,40 +260,82 @@ export default function EditRecord() {
     }
   }
 
-  // items already arrive sorted by section order — walk through once and drop in
+  // Group items by master1
+  const sectionGroups = [];
+  items.forEach((it) => {
+    let group = sectionGroups.find((g) => g.master1 === it.master1);
+    if (!group) {
+      group = { master1: it.master1, master1Type: it.master1Type, items: [] };
+      sectionGroups.push(group);
+    }
+    group.items.push(it);
+  });
 
   const rows = [];
-  let lastSection = undefined;
-  items.forEach((it, i) => {
-    if (it.master1Type !== lastSection) {
-      lastSection = it.master1Type;
+  let index = 1;
+  sectionGroups.forEach((group) => {
+    // Header
+    rows.push(
+      <tr key={`section-${group.master1 || group.master1Type}`}>
+        <td colSpan={7} className="bg-emerald-50 border-y border-emerald-100 px-4 py-2">
+          <p className="text-xs font-semibold text-emerald-700 tracking-wide">▶ {group.master1Type || "Section"}</p>
+        </td>
+      </tr>
+    );
+
+    let sectionMax = 0;
+    let sectionScore = 0;
+
+    // Items
+    group.items.forEach((it, i) => {
+      sectionMax += Number(it.max) || 0;
+      sectionScore += Number(it.score) || 0;
+
       rows.push(
-        <tr key={`section-${it.master1 || i}`}>
-          <td colSpan={7} className="bg-emerald-50 border-y border-emerald-100 px-4 py-2">
-            <p className="text-xs font-semibold text-emerald-700 tracking-wide">▶ {it.master1Type || "Section"}</p>
+        <tr key={it.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50/60"}>
+          <td className="px-2 py-2 text-gray-300 text-[10px]">{index}</td>
+          <td className="px-2 py-2 text-gray-700 leading-snug max-w-[220px]">{it.text}</td>
+          <td className="px-2 py-2 text-center">
+            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${it.cat === "Vital" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
+              {it.cat}
+            </span>
+          </td>
+          <td className="px-2 py-2 text-center text-gray-500">{it.max}</td>
+          <td className="px-2 py-2">
+            <YnCell value={it.yn} onChange={(val) => updateItem(it.id, "yn", val)} />
+          </td>
+          <td className="px-2 py-2 text-center">
+            <ScoreCell value={it.score} max={it.max} onChange={(val) => updateItem(it.id, "score", val)} />
+          </td>
+          <td className="px-2 py-2 max-w-[140px]">
+            <RemarksCell value={it.remarks} onChange={(val) => updateItem(it.id, "remarks", val)} />
           </td>
         </tr>
       );
-    }
+      index++;
+    });
+
+    // Footer with Weighted Average
+    const m1Info = master1Map[group.master1] || {};
+    const weight = Number(m1Info.weight) || 0;
+    const weightedAvg = sectionMax > 0 ? ((weight * sectionScore) / sectionMax).toFixed(2) : "0.00";
+
     rows.push(
-      <tr key={it.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50/60"}>
-        <td className="px-2 py-2 text-gray-300 text-[10px]">{i + 1}</td>
-        <td className="px-2 py-2 text-gray-700 leading-snug max-w-[220px]">{it.text}</td>
-        <td className="px-2 py-2 text-center">
-          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${it.cat === "Vital" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
-            {it.cat}
-          </span>
+      <tr key={`footer-${group.master1 || group.master1Type}`} className="bg-emerald-50/50 border-y border-emerald-100">
+        <td colSpan={2} className="px-4 py-2 text-xs font-semibold text-gray-700 text-right">
+          Weighted Average = {weight}
         </td>
-        <td className="px-2 py-2 text-center text-gray-500">{it.max}</td>
-        <td className="px-2 py-2">
-          <YnCell value={it.yn} onChange={(val) => updateItem(it.id, "yn", val)} />
+        <td className="px-2 py-2 text-center text-xs font-bold text-emerald-700">
+          {weightedAvg}
         </td>
-        <td className="px-2 py-2 text-center">
-          <ScoreCell value={it.score} max={it.max} onChange={(val) => updateItem(it.id, "score", val)} />
+        <td className="px-2 py-2 text-center text-xs font-bold text-gray-600">
+          {sectionMax}
         </td>
-        <td className="px-2 py-2 max-w-[140px]">
-          <RemarksCell value={it.remarks} onChange={(val) => updateItem(it.id, "remarks", val)} />
+        <td className="px-2 py-2 text-center text-xs"></td>
+        <td className="px-2 py-2 text-center text-xs font-bold text-gray-600">
+          {sectionScore}
         </td>
+        <td className="px-2 py-2 text-center text-xs"></td>
       </tr>
     );
   });
@@ -372,12 +414,11 @@ export default function EditRecord() {
             </table>
           </div>
 
-          <div className="bg-gray-50 border-t border-gray-100 px-4 py-3 flex items-center justify-between flex-wrap gap-3">
-            <p className="text-xs font-semibold text-gray-500">Weighted Average = 30</p>
+          <div className="bg-gray-50 border-t border-gray-100 px-4 py-3 flex items-center justify-end flex-wrap gap-3">
             <div className="flex gap-5">
               <div className="text-center">
                 <p className="text-lg font-bold text-emerald-700">{maxScore}</p>
-                <p className="text-[10px] text-gray-400">Max Score</p>
+                <p className="text-[10px] text-gray-400">Total Max Score</p>
               </div>
               <div className="text-center">
                 <p className="text-lg font-bold text-emerald-500">{yesCount}</p>
