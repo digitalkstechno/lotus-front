@@ -212,29 +212,24 @@ export const useTasks = () => {
     if (!found) return;
     const wasCompleted = found.task.completed;
     if (!wasCompleted && !found.parentId) {
-      const incompleteSubtasks = (found.task.subtasks || []).filter((s: any) => !s.completed);
-      if (incompleteSubtasks.length > 0) {
-        setLists((prev: any) =>
-          prev.map((l: any) => {
-            if (l.id !== found.listId) return l;
-            return {
-              ...l,
-              tasks: [
-                ...l.tasks.map((t: any) =>
-                  t.id === taskId
-                    ? { ...t, completed: true, subtasks: t.subtasks.filter((s: any) => s.completed) }
-                    : t
-                ),
-                ...incompleteSubtasks,
-              ],
-            };
-          })
-        );
-        return;
-      }
+      // Mark all subtasks as completed in Redux too
+      setLists((prev: any) =>
+        prev.map((l: any) => {
+          if (l.id !== found.listId) return l;
+          return {
+            ...l,
+            tasks: l.tasks.map((t: any) =>
+              t.id === taskId
+                ? { ...t, completed: true, subtasks: t.subtasks?.map((s: any) => ({ ...s, completed: true })) || [] }
+                : t
+            ),
+          };
+        })
+      );
+    } else {
+      updateTaskEverywhere(taskId, (t) => ({ ...t, completed: !t.completed }));
     }
     syncToBackend(taskId, { status: !wasCompleted ? "Completed" : "Pending" });
-    updateTaskEverywhere(taskId, (t) => ({ ...t, completed: !t.completed }));
   };
 
   const toggleStar = (taskId: string) => updateTaskEverywhere(taskId, (t) => {
@@ -354,7 +349,9 @@ export const useTasks = () => {
           const payload = {
             title: found.task.title,
             description: found.task.details || "",
-            date: found.task.dueDate || new Date().toISOString(),
+            date: found.task.date || new Date().toISOString(),
+            deadline: found.task.dueDate || null,
+            dueTime: found.task.dueTime || null,
             assigned_to_user: found.task.assign?.id || null,
             list: found.listId,
             parent_id: found.parentId || null,
@@ -498,6 +495,38 @@ export const useTasks = () => {
     setEditingTaskId(t.id);
     setAddingList(false);
     setEditDeadlineFor(null);
+  };
+
+  // Same as addTaskToList but pre-sets starred = true (for /starred route)
+  const addStarredTaskToList = (listId: string) => {
+    if (!listId) return;
+    const t = newTask("") as any;
+    t.listId = listId;
+    t.starred = true;          // ← default starred
+    t.isNew = true;
+
+    let maxOrder = -1;
+    const currentLists = store.getState().lists.lists;
+    const targetList = currentLists.find((l: any) => l.id === listId);
+    if (targetList && targetList.tasks.length > 0) {
+      maxOrder = Math.max(...targetList.tasks.map((task: any) => task.order || 0));
+    }
+    t.order = maxOrder + 1;
+
+    if (authUser) {
+      const uRole = authUser.role ? authUser.role.toLowerCase() : "";
+      t.assign = {
+        id: authUser._id || authUser.id,
+        name: authUser.fullName || authUser.name,
+        role: uRole === "unit_head" ? "Unit Head" : uRole === "team_head" ? "Team Head" : uRole === "admin" ? "Admin" : "Staff"
+      };
+    }
+
+    setLists((prev: any) => prev.map((l: any) => (l.id === listId ? { ...l, tasks: [...l.tasks, t] } : l)));
+    setEditingTaskId(t.id);
+    setAddingList(false);
+    setEditDeadlineFor(null);
+    return t.id;
   };
 
   const addSubtask = async (parentId: string) => {
@@ -879,7 +908,7 @@ export const useTasks = () => {
     tomorrowClickCount, setTomorrowClickCount, dragData: dragDataRef, dragOverTarget, setDragOverTarget,
     findTaskEverywhere, updateTaskEverywhere, removeTaskEverywhere, removeTaskFromTree,
     toggleComplete, toggleStar, setTitle, setDetails, setDate, setDueDate, setDueTime, setDueDateAndTime, setRepeat, clearDue,
-    setAssign, deleteTaskById, closeEditing, uploadTaskAttachment, removeTaskAttachment, addTaskToList, addSubtask, moveTaskToList, moveTaskToNewList,
+    setAssign, deleteTaskById, closeEditing, uploadTaskAttachment, removeTaskAttachment, addTaskToList, addStarredTaskToList, addSubtask, moveTaskToList, moveTaskToNewList,
     handleTomorrowClick, handleTodayClick, updateList, setSortBy, startRename, commitRename, deleteList,
     deleteAllCompleted, addList, toggleCompletedSection, dropAssign, promoteToMainTask, indentTask, getTask,
     fetchTasksForCurrentList, fetchPeople, loadingPeople,

@@ -10,7 +10,57 @@ import { MONTHS, ASSIGN_COLORS } from "../lib/constants";
 import { Overlay, MenuItem, ListPicker, AssignChip } from "./Shared";
 import { ReactSortable } from "react-sortablejs";
 
-export const TaskRow = ({ list, task: taskProp, parentId, depth = 0 }: any) => {
+// ── List picker used by the Starred page (rendered inside expanded TaskRow) ──
+function StarredListPicker({ lists, currentListId, onSelect }: { lists: any[]; currentListId: string; onSelect: (id: string, name: string) => void }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const current = lists.find((l: any) => l.id === currentListId);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen(p => !p); }}
+        className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 w-full cursor-pointer transition-colors ${open ? "border-emerald-500 bg-emerald-50" : "border-dashed border-gray-200 hover:border-emerald-400"}`}
+      >
+        <span className="text-xs text-gray-400 flex-shrink-0">List</span>
+        <span className="flex-1 text-xs text-gray-700 truncate text-left">{current?.name || "Select list"}</span>
+        <ChevronDown size={12} className={`text-gray-400 transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 bottom-full mb-1 w-full bg-white rounded-xl border border-gray-200 shadow-xl py-1 z-[200] max-h-48 overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {lists.map((l: any) => (
+            <button
+              key={l.id}
+              onClick={() => { onSelect(l.id, l.name); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-emerald-50 transition-colors text-gray-700"
+            >
+              <span className="w-4 flex-shrink-0">
+                {l.id === currentListId && <Check size={13} className="text-emerald-500" />}
+              </span>
+              <span className="truncate">{l.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChange }: any) => {
   const {
     editingTaskId, setEditingTaskId, dragOverTarget, setDragOverTarget, tomorrowClickCount,
     setTomorrowClickCount, openTaskMenu, setOpenTaskMenu, openMovePicker, setOpenMovePicker,
@@ -302,6 +352,12 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0 }: any) => {
               </div>
             )}
           </div>
+          {/* List picker — shown only in starred/special context when onListChange is provided */}
+          {onListChange && (
+            <div className="ml-9 mt-2">
+              <StarredListPicker lists={lists} currentListId={list.id} onSelect={(id, name) => onListChange(id, name, task.id)} />
+            </div>
+          )}
         </div>
         {renderPendingFileModal()}
         {renderAttachmentsModal()}
