@@ -103,12 +103,13 @@ export const TaskList = ({ list }: any) => {
         ) : (
           <h2 className="text-sm font-semibold  text-emerald-700 flex-1 truncate">{list.name}</h2>
         )}
-        <span className="text-xs text-emerald-700 px-1.5 py-0.5 rounded-full">{list.tasks.filter((t: any) => !t.completed).length}</span>
+        {/* <span className="text-xs text-emerald-700 px-1.5 py-0.5 rounded-full">{list.tasks.filter((t: any) => !t.completed).length}</span> */}
         <div className="relative">
-          <button onClick={(e) => { e.stopPropagation(); setOpenListMenu(openListMenu === list.id ? null : list.id); }} className=" text-emerald-700 hover:text-white p-0.5 transition-colors">
+          <button onClick={(e) => { e.stopPropagation(); setOpenListMenu(openListMenu === list.id ? null : list.id); }} className=" text-emerald-700 hover:text-emerald-500 p-0.5 transition-colors">
             <MoreVertical size={16} />
           </button>
           {openListMenu === list.id && (
+            
             <>
               <Overlay onClose={() => setOpenListMenu(null)} />
               <div className="absolute right-0 mt-1 w-56 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1 overflow-hidden" onClick={(e) => e.stopPropagation()}>

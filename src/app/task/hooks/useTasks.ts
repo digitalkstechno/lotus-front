@@ -586,9 +586,15 @@ export const useTasks = () => {
   const updateList = (listId: string, fn: (l: any) => any) => setLists((prev: any) => prev.map((l: any) => (l.id === listId ? fn(l) : l)));
 
   const setSortBy = (listId: string, value: string) => {
+    // 1. Update local Redux state immediately (optimistic)
     updateList(listId, (l) => ({ ...l, sortBy: value }));
+    // 2. Persist sortBy to backend
     dispatch(updateListThunk({ id: listId, data: { sortBy: value } }) as any);
     setOpenListMenu(null);
+    // 3. Re-fetch tasks for this list with the new sortBy so order is applied from server
+    if (userId) {
+      dispatch(fetchTasksForList({ listId, userId, page: 1, limit: 20, sortBy: value }) as any);
+    }
   };
 
   const startRename = (list: any) => {
