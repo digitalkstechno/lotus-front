@@ -1,11 +1,12 @@
 "use client";
-
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useChecklist } from "./context";
+import { useSidebar } from "@/components/SidebarContext";
 
 export default function ChecklistRecords() {
   const router = useRouter();
+  const { collapsed, setCollapsed } = useSidebar();
   const { records, loaded } = useChecklist();
   const [search, setSearch] = useState("");
 
@@ -34,6 +35,13 @@ export default function ChecklistRecords() {
   return (
     <div className="min-h-screen bg-[#f8fafc]">
       <div className="bg-emerald-700 text-white px-6 py-4 flex items-center gap-3 sticky top-0 z-20 shadow-md">
+        {collapsed && (
+          <button onClick={() => setCollapsed(false)} className="text-white hover:text-emerald-200 p-1 shrink-0">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        )}
         <div className="flex-1">
           <p className="font-semibold text-sm leading-tight">Saved Checklist Records</p>
           <p className="text-[11px] opacity-80 mt-0.5">{records.length} record{records.length !== 1 ? "s" : ""}</p>

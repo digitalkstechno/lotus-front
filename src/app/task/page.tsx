@@ -7,8 +7,10 @@ import { TaskList } from "./components/TaskList";
 import { CalendarPicker, TimePickerModal, RepeatModal } from "./components/Modals";
 import { ReactSortable } from "react-sortablejs";
 import { fetchListsByUser, resetLists } from "../../redux/slices/listSlice";
+import { useSidebar } from "@/components/SidebarContext";
 
 function AppContent() {
+  const { collapsed, setCollapsed } = useSidebar();
   const dispatch = useDispatch();
   const authUser = useSelector((state: any) => state.auth.user);
 
@@ -52,10 +54,17 @@ function AppContent() {
     if (node) observerRef.current.observe(node);
   }, [loadingLists, hasMore, loadMoreLists]);
 
-  return (
+  return (  
     <div className="min-h-screen w-full bg-[#f8fafc]" onClick={closeEditing}>
       {/* Header */}
-      <div className="bg-emerald-700 text-white px-6 py-4 flex items-center justify-between shadow-md sticky top-0 z-20">
+      <div className="bg-emerald-700 text-white px-6 py-4 flex items-center gap-3 shadow-md sticky top-0 z-20">
+        {collapsed && (
+          <button onClick={() => setCollapsed(false)} className="text-white hover:text-emerald-200 p-1 shrink-0">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        )}
         <div>
           <h1 className="text-sm font-semibold">Tasks</h1>
           <p className="text-[11px] opacity-80 mt-0.5">Manage your lists, tasks and subtasks</p>

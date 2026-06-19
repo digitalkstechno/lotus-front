@@ -7,6 +7,7 @@ import AuthGuard from "@/components/AuthGuard";
 import { ChecklistProvider } from "./checklist/context";
 import ReduxProvider from "@/redux/ReduxProvider";
 import { Toaster } from "sonner";
+import SidebarLayout from "@/components/SidebarLayout";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,15 +34,14 @@ export default function RootLayout({
       <body className="flex h-screen overflow-hidden">
         <ReduxProvider>
           <AuthGuard>
-            <Sidebar />
-            <main className="flex-1 overflow-y-auto">
-               <FCMProvider>
-              <ChecklistProvider>
-                {children}
-                <Toaster position="top-right" richColors />
-              </ChecklistProvider>
-               </FCMProvider>
-            </main>
+            <SidebarLayout>
+              <FCMProvider>
+                <ChecklistProvider>
+                  {children}
+                  <Toaster position="top-right" richColors />
+                </ChecklistProvider>
+              </FCMProvider>
+            </SidebarLayout>
           </AuthGuard>
         </ReduxProvider>
       </body>

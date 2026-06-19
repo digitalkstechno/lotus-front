@@ -16,15 +16,19 @@ import {
   X,
   Loader2,
 } from "lucide-react";
-import { getListsByUserApi, createListApi, updateListApi } from "../services/listService";
+import {
+  getListsByUserApi,
+  createListApi,
+  updateListApi,
+} from "../services/listService";
 import { logoutApi } from "../services/userService";
 
 const PRIMARY_NAV = [
-  { id: "task",      label: "Task",       icon: ClipboardList, path: "/task" },
-  { id: "starred",   label: "Starred",    icon: Star,          path: "/starred" },
-  { id: "checklist", label: "Checklist",  icon: ListChecks,    path: "/checklist" },
-  { id: "staff",     label: "Staff",      icon: Users,         path: "/staff" },
-  { id: "settings",  label: "Settings",   icon: Settings,      path: "/settings" },
+  { id: "task", label: "Task", icon: ClipboardList, path: "/task" },
+  { id: "starred", label: "Starred", icon: Star, path: "/starred" },
+  { id: "checklist", label: "Checklist", icon: ListChecks, path: "/checklist" },
+  { id: "staff", label: "Staff", icon: Users, path: "/staff" },
+  { id: "settings", label: "Settings", icon: Settings, path: "/settings" },
 ];
 
 type ListItem = {
@@ -41,11 +45,21 @@ type UserInfo = {
   [key: string]: any;
 };
 
-const ADMIN_ONLY_IDS = ["staff", "checklist", "settings"];
+const ADMIN_ONLY_IDS = ["staff", "settings"];
+const ALLOWED_ROLES: Record<string, string[]> = {
+  checklist: ["admin", "staff", "unit_head", "team_head"],
+};
 
 const getVisibleNav = (role?: string) => {
-  if (role?.toLowerCase() === "admin") return PRIMARY_NAV;
-  return PRIMARY_NAV.filter((item) => !ADMIN_ONLY_IDS.includes(item.id));
+  const normalizedRole = role?.toLowerCase() || "";
+  if (normalizedRole === "admin") return PRIMARY_NAV;
+
+  return PRIMARY_NAV.filter((item) => {
+    if (ALLOWED_ROLES[item.id]) {
+      return ALLOWED_ROLES[item.id].includes(normalizedRole);
+    }
+    return !ADMIN_ONLY_IDS.includes(item.id);
+  });
 };
 
 const getTokenPayload = (): UserInfo | null => {
@@ -60,23 +74,28 @@ const getTokenPayload = (): UserInfo | null => {
   }
 };
 
-export default function Sidebar() {
-  const router       = useRouter();
-  const pathname     = usePathname();
+interface SidebarProps {
+  collapsed: boolean;
+  setCollapsed: (v: boolean | ((p: boolean) => boolean)) => void;
+}
+
+export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeListId = searchParams.get("list_id");
 
-  const [listsOpen, setListsOpen]               = useState(true);
-  const [checkedLists, setCheckedLists]         = useState<Record<string, boolean>>({});
-  const [userLists, setUserLists]               = useState<ListItem[]>([]);
-  const [loadingLists, setLoadingLists]         = useState(false);
+  const [listsOpen, setListsOpen] = useState(true);
+  const [checkedLists, setCheckedLists] = useState<Record<string, boolean>>({});
+  const [userLists, setUserLists] = useState<ListItem[]>([]);
+  const [loadingLists, setLoadingLists] = useState(false);
   const [showNewListInput, setShowNewListInput] = useState(false);
-  const [newListName, setNewListName]           = useState("");
-  const [creating, setCreating]                 = useState(false);
-  const [createError, setCreateError]           = useState<string | null>(null);
-  const [userInfo, setUserInfo]                 = useState<UserInfo | null>(null);
-  const [visibleNav, setVisibleNav]             = useState<typeof PRIMARY_NAV>(PRIMARY_NAV);
-  const [collapsed, setCollapsed]               = useState(false);
+  const [newListName, setNewListName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const [visibleNav, setVisibleNav] = useState<typeof PRIMARY_NAV>(PRIMARY_NAV);
+  const [showNewListModal, setShowNewListModal] = useState(false);
 
   useEffect(() => {
     const payload = getTokenPayload();
@@ -106,7 +125,9 @@ export default function Sidebar() {
         if (!cancelled) setLoadingLists(false);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [pathname]);
 
   const handleLogout = async () => {
@@ -118,7 +139,7 @@ export default function Sidebar() {
     } catch (e) {
       console.error("Failed to call logout API", e);
     }
-    
+
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("fcm_token");
@@ -130,7 +151,7 @@ export default function Sidebar() {
     if (!trimmed) return;
 
     const payload = getTokenPayload();
-    const userId  = payload?.id || null;
+    const userId = payload?.id || null;
 
     setCreating(true);
     setCreateError(null);
@@ -141,7 +162,7 @@ export default function Sidebar() {
       });
       const created: ListItem = res.data?.data || res.data;
       setUserLists((prev) => [...prev, created]);
-      setShowNewListInput(false);
+      setShowNewListModal(false);
       setNewListName("");
       router.push(`/task?list_id=${created._id}`);
     } catch (err: any) {
@@ -155,7 +176,7 @@ export default function Sidebar() {
   const handleNewListKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") handleCreateList();
     if (e.key === "Escape") {
-      setShowNewListInput(false);
+      setShowNewListModal(false);
       setNewListName("");
       setCreateError(null);
     }
@@ -170,7 +191,7 @@ export default function Sidebar() {
     const isCurrentlyChecked = !!checkedLists[id];
     const newCheckedState = !isCurrentlyChecked;
     setCheckedLists((p) => ({ ...p, [id]: newCheckedState }));
-    
+
     if (id === "my-tasks") return; // Bypass backend call for the virtual "My Tasks" list
 
     try {
@@ -183,28 +204,71 @@ export default function Sidebar() {
   };
 
   // User display info
-  const displayName  = userInfo?.fullName || userInfo?.name || "User";
+  const displayName = userInfo?.fullName || userInfo?.name || "User";
   const displayEmail = userInfo?.email || "";
-  const firstLetter  = displayName.charAt(0).toUpperCase();
+  const firstLetter = displayName.charAt(0).toUpperCase();
 
   if (pathname === "/login") return null;
 
   return (
-    <aside className={`${collapsed ? "w-14" : "w-56"} h-screen flex flex-col select-none shrink-0 bg-white border-r border-gray-100 transition-all duration-200`}>
-
+    <aside
+      className={`${collapsed ? "w-16" : "w-56"} h-screen flex flex-col select-none shrink-0 bg-white border-r border-gray-100 transition-all duration-200`}
+    >
       {/* ── Header ── */}
-      <div className={`px-3 pt-5 pb-4 flex border-b border-gray-100 ${collapsed ? "flex-col items-center gap-2" : "flex-row items-center gap-3"}`}>
+      <div
+        className={`px-3 pt-5 pb-4 flex border-b border-gray-100 ${collapsed ? "flex-col items-center  gap-2" : "flex-row items-center justify-between gap-3"}`}
+      >
         <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center shrink-0">
           <MessageSquare className="w-4 h-4 text-white" />
         </div>
-        {!collapsed && (
+        {/* {!collapsed && (
           <div className="flex-1 min-w-0">
-            <p className="text-gray-900 font-bold text-[15px] leading-tight">Lotus</p>
-            <p className="text-gray-400 text-[11px] leading-tight">Reminder Suite</p>
+            <p className="text-gray-900 font-bold text-[15px] leading-tight">
+              Lotus
+            </p>
+            <p className="text-gray-400 text-[11px] leading-tight">
+              Reminder Suite
+            </p>
           </div>
         )}
-        <button onClick={() => setCollapsed(p => !p)} className="text-gray-400 hover:text-gray-600 p-1 shrink-0">
-          <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${collapsed ? "-rotate-90" : "rotate-90"}`} />
+        <button
+          onClick={() => setCollapsed((p) => !p)}
+          className="text-gray-400 hover:text-gray-600 p-1 shrink-0"
+        >
+          <ChevronDown
+            className={`w-4 h-4 transition-transform duration-200 ${collapsed ? "-rotate-90" : "rotate-90"}`}
+          />
+        </button> */}
+        {!collapsed && (
+          <div className="flex-1 min-w-0">
+            <p className="text-gray-900 font-bold text-[15px] leading-tight">
+              Lotus
+            </p>
+            <p className="text-gray-400 text-[11px] leading-tight">
+              Reminder Suite
+            </p>
+          </div>
+        )}
+
+        {/* Hamburger  */}
+        <button
+          onClick={() => setCollapsed((p) => !p)}
+          className="text-gray-400 hover:text-gray-600 p-1 shrink-0"
+          title={collapsed ? "Expand sidebar" : "Hide sidebar"}
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 6h16M4 12h16M4 18h16"
+            />
+          </svg>
         </button>
       </div>
 
@@ -212,7 +276,7 @@ export default function Sidebar() {
       <div className="py-3 shrink-0">
         <nav className="px-3 space-y-0.5">
           {visibleNav.map((item) => {
-            const Icon   = item.icon;
+            const Icon = item.icon;
             const active = isActive(item.path);
             return (
               <button
@@ -225,7 +289,9 @@ export default function Sidebar() {
                     : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
                 }`}
               >
-                <Icon className={`w-[17px] h-[17px] shrink-0 ${active ? "text-[#00A884]" : "text-gray-400"}`} />
+                <Icon
+                  className={`w-[17px] h-[17px] shrink-0 ${active ? "text-[#00A884]" : "text-gray-400"}`}
+                />
                 {!collapsed && <span>{item.label}</span>}
               </button>
             );
@@ -236,88 +302,123 @@ export default function Sidebar() {
       {/* ── Lists section ── */}
       <div className="flex-1 flex flex-col px-3 mt-2 min-h-0">
         <button
-            onClick={() => setListsOpen((p) => !p)}
-            className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors cursor-pointer shrink-0"
-          >
-            <div className="flex items-center gap-3">
-              <CheckSquare className="w-[17px] h-[17px] text-gray-400" />
-              {!collapsed && <span className="text-sm font-medium">Lists</span>}
-            </div>
-            {!collapsed && <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${listsOpen ? "rotate-180" : ""}`} />}
-          </button>
+          onClick={() => setListsOpen((p) => !p)}
+          className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors cursor-pointer shrink-0"
+        >
+          <div className="flex items-center gap-3">
+            <CheckSquare className="w-[17px] h-[17px] text-gray-400" />
+            {!collapsed && <span className="text-sm font-medium">Lists</span>}
+          </div>
+          {!collapsed && (
+            <ChevronDown
+              className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${listsOpen ? "rotate-180" : ""}`}
+            />
+          )}
+        </button>
 
-          {listsOpen && (
-            <div className="mt-0.5 ml-3 pl-3 border-l border-gray-100 space-y-0.5 flex-1 overflow-y-auto">
-
-              {/* User na lists */}
-              {loadingLists ? (
-                <p className="px-3 py-2 text-[11px] text-gray-300 italic">Loading lists…</p>
-              ) : (
-                userLists.map((list) => (
-                  <button
-                    key={list._id}
-                    onClick={() => router.push(`/task?list_id=${list._id}`)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
-                      activeListId === list._id
-                        ? "text-[#00A884] bg-[#E7F8F1]"
-                        : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={!!checkedLists[list._id]}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={() => toggleListChecked(list._id)}
-                      className="w-3.5 h-3.5 rounded border-gray-300 text-[#00A884] focus:ring-[#00A884] cursor-pointer shrink-0"
-                    />
-                    <span className="truncate">{list.name}</span>
-                  </button>
-                ))
-              )}
-
-              {/* Create new list */}
-              {showNewListInput ? (
-                <div className="px-3 pt-1.5 pb-1 space-y-1">
+        {listsOpen && (
+          <div className="mt-0.5 ml-3 pl-3 border-l border-gray-100 space-y-0.5 flex-1 overflow-y-auto">
+            {/* User na lists */}
+            {loadingLists ? (
+              <p className="px-3 py-2 text-[11px] text-gray-300 italic">
+                Loading lists…
+              </p>
+            ) : (
+              userLists.map((list) => (
+                <button
+                  key={list._id}
+                  onClick={() => router.push(`/task?list_id=${list._id}`)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
+                    activeListId === list._id
+                      ? "text-[#00A884] bg-[#E7F8F1]"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!checkedLists[list._id]}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => toggleListChecked(list._id)}
+                    className="w-3.5 h-3.5 rounded border-gray-300 text-[#00A884] focus:ring-[#00A884] cursor-pointer shrink-0"
+                  />
+                  <span className="truncate">{list.name}</span>
+                </button>
+              ))
+            )}
+            {/* Modal */}
+            {showNewListModal && (
+              <div
+                className="fixed inset-0 bg-black/60 flex items-center justify-center z-[300]"
+                onClick={() => {
+                  setShowNewListModal(false);
+                  setNewListName("");
+                  setCreateError(null);
+                }}
+              >
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-80 rounded-2xl bg-white shadow-2xl p-6"
+                >
+                  <h3 className="text-black text-base font-semibold mb-4">
+                    Create new list
+                  </h3>
                   <input
                     autoFocus
-                    type="text"
                     value={newListName}
-                    onChange={(e) => { setNewListName(e.target.value); setCreateError(null); }}
-                    onKeyDown={handleNewListKeyDown}
-                    placeholder="List name…"
-                    className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-1 focus:ring-[#00A884] focus:border-[#00A884]"
+                    onChange={(e) => {
+                      setNewListName(e.target.value);
+                      setCreateError(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleCreateList();
+                      if (e.key === "Escape") {
+                        setShowNewListModal(false);
+                        setNewListName("");
+                      }
+                    }}
+                    placeholder="Enter name"
+                    className="w-full bg-transparent border-b border-emerald-600 text-black placeholder-neutral-500 text-sm py-2 mb-6 outline-none"
                   />
                   {createError && (
-                    <p className="text-[11px] text-red-400">{createError}</p>
+                    <p className="text-[11px] text-red-400 mb-3">
+                      {createError}
+                    </p>
                   )}
-                  <div className="flex gap-1.5">
+                  <div className="flex items-center justify-end gap-6">
+                    <button
+                      onClick={() => {
+                        setShowNewListModal(false);
+                        setNewListName("");
+                        setCreateError(null);
+                      }}
+                      className="text-sm text-gray-500 hover:text-gray-800 px-3 py-1.5 rounded-lg hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
                     <button
                       onClick={handleCreateList}
                       disabled={creating || !newListName.trim()}
-                      className="flex-1 flex items-center justify-center gap-1 text-xs font-medium py-1.5 rounded-md bg-[#00A884] text-white disabled:opacity-50 hover:bg-[#009070] transition-colors"
+                      className="text-sm text-white bg-emerald-500 hover:bg-emerald-600 px-4 py-1.5 rounded-full font-medium shadow-sm"
                     >
-                      {creating ? <Loader2 className="w-3 h-3 animate-spin" /> : "Create"}
-                    </button>
-                    <button
-                      onClick={() => { setShowNewListInput(false); setNewListName(""); setCreateError(null); }}
-                      className="p-1.5 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-                    >
-                      <X className="w-3.5 h-3.5" />
+                      {creating ? "Creating..." : "Done"}
                     </button>
                   </div>
                 </div>
-              ) : (
-                <button
-                  onClick={() => setShowNewListInput(true)}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-50 hover:text-[#00A884] transition-colors cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5 shrink-0" />
-                  <span>Create new list</span>
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+              </div>
+            )}{" "}
+            <button
+              onClick={() => {
+                setShowNewListModal(true);
+                setNewListName("");
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-50 hover:text-[#00A884] transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 shrink-0" />
+              <span>Create new list</span>
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* ── Footer ── */}
       <div className="px-3 py-3 border-t border-gray-100 space-y-0.5">
@@ -327,8 +428,12 @@ export default function Sidebar() {
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-gray-800 text-xs font-semibold truncate">{displayName}</p>
-              <p className="text-gray-400 text-[10px] truncate">{displayEmail}</p>
+              <p className="text-gray-800 text-xs font-semibold truncate">
+                {displayName}
+              </p>
+              <p className="text-gray-400 text-[10px] truncate">
+                {displayEmail}
+              </p>
             </div>
           )}
         </div>

@@ -9,6 +9,7 @@ import { fetchListsByUser, resetLists } from "../../redux/slices/listSlice";
 import { getStarredTasksByUserApi } from "../../services/taskService";
 import { Star, CirclePlus } from "lucide-react";
 import { store } from "../../redux/store";
+import { useSidebar } from "@/components/SidebarContext";
 
 // ── Helper: map backend task → frontend task shape ────────────────────────────
 function mapTask(t: any) {
@@ -53,6 +54,7 @@ function mapTask(t: any) {
 
 // ── Starred page content ──────────────────────────────────────────────────────
 function StarredContent() {
+  const { collapsed, setCollapsed } = useSidebar();
   const dispatch = useDispatch();
   const authUser = useSelector((state: any) => state.auth.user);
 
@@ -255,6 +257,13 @@ function StarredContent() {
     <div className="min-h-screen w-full bg-[#f8fafc]" onClick={closeEditing}>
       {/* ── Header ── */}
       <div className="bg-emerald-700 text-white px-6 py-4 flex items-center gap-3 shadow-md sticky top-0 z-20">
+        {collapsed && (
+          <button onClick={() => setCollapsed(false)} className="text-white hover:text-emerald-200 p-1 shrink-0">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        )}
         <Star size={16} className="fill-amber-300 text-amber-300 flex-shrink-0" />
         <div>
           <h1 className="text-sm font-semibold">Starred Tasks</h1>
