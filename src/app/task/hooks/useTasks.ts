@@ -205,6 +205,16 @@ export const useTasks = () => {
     }
   };
 
+  const parseDateString = (val: string | null | undefined) => {
+    if (val === "today") return new Date().toISOString();
+    if (val === "tomorrow") {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      return d.toISOString();
+    }
+    return val || new Date().toISOString();
+  };
+
   // --- Actions ---
   const toggleComplete = (taskId: string) => {
     const currentLists = store.getState().lists.lists;
@@ -349,7 +359,7 @@ export const useTasks = () => {
           const payload = {
             title: found.task.title,
             description: found.task.details || "",
-            date: found.task.date || new Date().toISOString(),
+            date: parseDateString(found.task.date),
             deadline: found.task.dueDate || null,
             dueTime: found.task.dueTime || null,
             assigned_to_user: found.task.assign?.id || null,
@@ -403,7 +413,7 @@ export const useTasks = () => {
         const payload = {
           title: found.task.title || "",
           description: found.task.details || "",
-          date: found.task.dueDate || new Date().toISOString(),
+          date: parseDateString(found.task.date),
           assigned_to_user: found.task.assign?.id || null,
           list: found.listId,
           parent_id: found.parentId || null,
