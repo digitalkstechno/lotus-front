@@ -134,7 +134,7 @@ export const TaskList = ({ list }: any) => {
 
       <div className="flex-1 overflow-y-auto min-h-0 relative">
         <div className="px-2 pb-2 pt-1 space-y-1">
-          {getActiveGroups(list).map((group, gi) => (group.tasks.length > 0 || group.label) && (
+          {getActiveGroups(list).map((group, gi, arr) => (group.tasks.length > 0 || group.label || arr.length === 1) && (
             <div key={gi}>
               {group.label && <p className="px-2 pt-2 pb-1 text-[11px] font-semibold text-emerald-600 uppercase tracking-wider">{group.label}</p>}
               {/* Wrapper div carries list/parent context for onSortEnd via closest() */}
@@ -150,7 +150,7 @@ export const TaskList = ({ list }: any) => {
                   onEnd={onSortEnd}
                   handle=".task-drag-handle"
                   animation={150}
-                  className="space-y-1 min-h-[5px]"
+                  className="space-y-1 min-h-[50px] w-full"
                 >
                   {group.tasks.map((task: any) => <TaskRow key={task.id} list={list} task={task} parentId={null} />)}
                 </ReactSortable>
