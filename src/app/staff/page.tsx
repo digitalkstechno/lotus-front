@@ -1075,18 +1075,34 @@ export default function StaffPage() {
     <>
       <div className="flex flex-col h-screen w-full overflow-hidden bg-white font-sans text-xs">
         {/* FULL WIDTH HEADER */}
-        <div className="bg-emerald-700 text-white px-6 py-4 shadow-md shrink-0 flex items-center gap-3">
+
+        <div className="bg-emerald-700 text-white px-6 py-4 flex items-center gap-3 shadow-md sticky top-0 z-20">
           {collapsed && (
-            <button onClick={() => setCollapsed(false)} className="text-white hover:text-emerald-200 p-1 shrink-0">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <button
+              onClick={() => setCollapsed(false)}
+              className="text-white hover:text-emerald-200 p-1 shrink-0"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
               </svg>
             </button>
           )}
-          <h1 className="text-sm font-semibold">Staff</h1>
-          <p className="text-[11px] opacity-80 mt-0.5">
-            Manage your organization staff
-          </p>
+          <div>
+            <h1 className="text-sm font-semibold">Staff</h1>
+            <p className="text-[11px] opacity-80 mt-0.5">
+              Manage your organization staff
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-1 overflow-hidden">

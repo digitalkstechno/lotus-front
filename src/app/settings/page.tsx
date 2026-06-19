@@ -27,6 +27,7 @@ import {
   updateMaster2,
   deleteMaster2,
 } from "../../redux/slices/master2Slice";
+import { useSidebar } from "@/components/SidebarContext";
 
 type Master1Item = {
   id: string;
@@ -45,6 +46,7 @@ type Master2Item = {
 };
 
 export default function UnifiedMastersPage() {
+  const { collapsed, setCollapsed } = useSidebar();
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
 
@@ -338,7 +340,27 @@ export default function UnifiedMastersPage() {
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-slate-50 font-sans text-xs">
-      <div className="bg-emerald-700 text-white px-6 py-4 shadow-md shrink-0 flex items-center gap-3">
+      <div className="bg-emerald-700 text-white px-6 py-4 flex items-center gap-3 shadow-md sticky top-0 z-20">
+        {collapsed && (
+          <button
+            onClick={() => setCollapsed(false)}
+            className="text-white hover:text-emerald-200 p-1 shrink-0"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            </svg>
+          </button>
+        )}
         <div>
           <h1 className="text-sm font-semibold">Masters Directory</h1>
           <p className="text-[11px] opacity-80 mt-0.5">
