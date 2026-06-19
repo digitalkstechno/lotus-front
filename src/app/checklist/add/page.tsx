@@ -141,13 +141,12 @@ function ScoreCell({ value, max, onChange, disabled }) {
   ) : (
     <span
       onClick={startEdit}
-      className={`inline-block px-2 py-0.5 rounded-md text-[11px] transition-colors ${
-        disabled 
-          ? "bg-gray-50 text-gray-400 cursor-not-allowed opacity-60" 
-          : value !== null && value !== undefined
-            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 cursor-pointer"
-            : "text-gray-300 italic hover:text-emerald-400 cursor-pointer"
-      }`}
+      className={`inline-block px-2 py-0.5 rounded-md text-[11px] transition-colors ${disabled
+        ? "bg-gray-50 text-gray-400 cursor-not-allowed opacity-60"
+        : value !== null && value !== undefined
+          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 cursor-pointer"
+          : "text-gray-300 italic hover:text-emerald-400 cursor-pointer"
+        }`}
       title={disabled ? "Score disabled" : "Click to edit"}
     >
       {value !== null && value !== undefined ? value : "—"}
@@ -175,9 +174,8 @@ function RemarksCell({ value, onChange }) {
     />
   ) : (
     <span onClick={startEdit}
-      className={`text-[10px] cursor-pointer hover:text-emerald-600 transition-colors flex items-start gap-0.5 leading-snug ${
-        value ? "text-gray-500 italic" : "text-gray-300 italic"
-      }`}
+      className={`text-[10px] cursor-pointer hover:text-emerald-600 transition-colors flex items-start gap-0.5 leading-snug ${value ? "text-gray-500 italic" : "text-gray-300 italic"
+        }`}
       title={value || "Click to add remarks"}>
       <span className="line-clamp-2">{value || "—"}</span>
     </span>
@@ -192,8 +190,12 @@ export default function AddChecklist() {
   const [savedMsg, setSavedMsg] = useState(false);
 
   useEffect(() => {
-    fetchMasterItems();
-  }, []);
+    items.forEach((it) => {
+      if (it.yn === "Yes" && (it.score === null || it.score === undefined)) {
+        updateItem(it.id, "score", Number(it.max) || 0);
+      }
+    });
+  }, [items.length]);
 
   if (!loaded) {
     return (
@@ -283,14 +285,16 @@ export default function AddChecklist() {
           </td>
           <td className="px-2 py-2 text-center text-gray-500">{it.max}</td>
           <td className="px-2 py-2">
-            <YnCell 
-              value={it.yn} 
+            <YnCell
+              value={it.yn}
               onChange={(val) => {
                 updateItem(it.id, "yn", val);
                 if (val === "No") {
                   updateItem(it.id, "score", 0);
+                } else if (val === "Yes") {
+                  updateItem(it.id, "score", Number(it.max) || 0);
                 }
-              }} 
+              }}
             />
           </td>
           <td className="px-2 py-2 text-center">
@@ -371,49 +375,13 @@ export default function AddChecklist() {
           </div>
 
           <div className="grid grid-cols-2 divide-x divide-y divide-gray-100">
-            <InlineField
-              label="Name of 3PL"
-              value={info.nameOf3PL}
-              onChange={setInfoField("nameOf3PL")}
-              placeholder="e.g. Lotus Marketing"
-            />
-            <InlineField
-              label="Location"
-              value={info.location}
-              onChange={setInfoField("location")}
-              placeholder="e.g. NIYOL"
-            />
-            <InlineField
-              label="Person Met"
-              value={info.personMet}
-              onChange={setInfoField("personMet")}
-              placeholder="e.g. Viresh Modi"
-            />
-            <InlineField
-              label="Designation"
-              value={info.designation}
-              onChange={setInfoField("designation")}
-              placeholder="e.g. Manager"
-            />
-            <InlineField
-              label="Assessed By"
-              value={info.assessedBy}
-              onChange={setInfoField("assessedBy")}
-              placeholder="e.g. Self"
-            />
-            <InlineField
-              label="Date"
-              value={info.date}
-              onChange={setInfoField("date")}
-              type="date"
-              placeholder="Select date"
-            />
-            <InlineField
-              label="Month"
-              value={info.month}
-              onChange={setInfoField("month")}
-              placeholder="e.g. Apr-26"
-            />
+            <InlineField label="Name of 3PL" value={info.nameOf3PL} onChange={setInfoField("nameOf3PL")} placeholder="e.g. Lotus Marketing" />
+            <InlineField label="Location" value={info.location} onChange={setInfoField("location")} placeholder="e.g. NIYOL" />
+            <InlineField label="Person Met" value={info.personMet} onChange={setInfoField("personMet")} placeholder="e.g. Viresh Modi" />
+            <InlineField label="Designation" value={info.designation} onChange={setInfoField("designation")} placeholder="e.g. Manager" />
+            <InlineField label="Assessed By" value={info.assessedBy} onChange={setInfoField("assessedBy")} placeholder="e.g. Self" />
+            <InlineField label="Date" value={info.date} onChange={setInfoField("date")} type="date" placeholder="Select date" />
+            <InlineField label="Month" value={info.month} onChange={setInfoField("month")} placeholder="e.g. Apr-26" />
             <div className="px-4 py-3">
               <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">
                 Assessment Period

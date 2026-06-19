@@ -18,7 +18,7 @@ const INITIAL_INFO = {
 const ChecklistContext = createContext(null);
 
 export function ChecklistProvider({ children }) {
-  const [items, setItems] = useState([]);       
+  const [items, setItems] = useState([]);
   const [info, setInfo] = useState(INITIAL_INFO);
   const [records, setRecords] = useState([]);
   const [master1List, setMaster1List] = useState([]);
@@ -28,7 +28,7 @@ export function ChecklistProvider({ children }) {
 
   async function getRecord(id) {
     try {
-      if(typeof window !== "undefined" && localStorage.getItem("token")){
+      if (typeof window !== "undefined" && localStorage.getItem("token")) {
         const res = await axiosInstance.get(`/checklist/${id}`);
         return res.data?.data || res.data;
       }
@@ -40,7 +40,7 @@ export function ChecklistProvider({ children }) {
 
   async function updateRecord(id, body) {
     try {
-      if(typeof window !== "undefined" && localStorage.getItem("token")){
+      if (typeof window !== "undefined" && localStorage.getItem("token")) {
         const res = await updateChecklistApi(id, body);
         await fetchRecordsList(); // list refresh
         return { success: true, data: res.data?.data || res.data };
@@ -52,41 +52,41 @@ export function ChecklistProvider({ children }) {
   }
 
   async function fetchMasterItems() {
-      try {
-        if(typeof window !== "undefined" && localStorage.getItem("token")){
-          const master1Res = await axiosInstance.get("/master1");
-          const master1Data = master1Res.data?.data || [];
-          setMaster1List(master1Data);
-          const sortedMaster1 = [...master1Data].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-          const master2Results = await Promise.all(
-            sortedMaster1.map((m1) => axiosInstance.get(`/master2/master1/${m1._id}`))
-          );
-          const allMapped = [];
-          sortedMaster1.forEach((m1, idx) => {
-            const data = master2Results[idx]?.data?.data || [];
-            const mapped = data.map((item) => ({
-              id: item._id,
-              master2: item._id,
-              master1: item.master1_id?._id || m1._id,
-              master1Type: item.master1_id?.type || m1.type,
-              master1Order: m1.order,
-              text: item.particulars,
-              cat: item.category,
-              max: item.max_score,
-              yn: "Yes",
-              score: null,
-              remarks: "",
-              order: item.order,
-            }));
-            allMapped.push(...mapped);
-          });
-          setItems(allMapped);
-        }
-      } catch (e) {
-        console.error("Failed to fetch master1/master2 items", e);
-      } finally {
-        setLoaded(true);
+    try {
+      if (typeof window !== "undefined" && localStorage.getItem("token")) {
+        const master1Res = await axiosInstance.get("/master1");
+        const master1Data = master1Res.data?.data || [];
+        setMaster1List(master1Data);
+        const sortedMaster1 = [...master1Data].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        const master2Results = await Promise.all(
+          sortedMaster1.map((m1) => axiosInstance.get(`/master2/master1/${m1._id}`))
+        );
+        const allMapped = [];
+        sortedMaster1.forEach((m1, idx) => {
+          const data = master2Results[idx]?.data?.data || [];
+          const mapped = data.map((item) => ({
+            id: item._id,
+            master2: item._id,
+            master1: item.master1_id?._id || m1._id,
+            master1Type: item.master1_id?.type || m1.type,
+            master1Order: m1.order,
+            text: item.particulars,
+            cat: item.category,
+            max: item.max_score,
+            yn: "Yes",
+            score: Number(item.max_score) || 0,
+            remarks: "",
+            order: item.order,
+          }));
+          allMapped.push(...mapped);
+        });
+        setItems(allMapped);
       }
+    } catch (e) {
+      console.error("Failed to fetch master1/master2 items", e);
+    } finally {
+      setLoaded(true);
+    }
   }
 
   // Master1 (sections) + Master2 (checklist items, fetched per section) on mount
@@ -99,7 +99,7 @@ export function ChecklistProvider({ children }) {
   async function fetchRecordsList(page = 1, limit = 10) {
     setFetchingRecords(true);
     try {
-      if(typeof window !== "undefined" && localStorage.getItem("token")){
+      if (typeof window !== "undefined" && localStorage.getItem("token")) {
         const res = await getChecklistsApi(page, limit);
         const data = res.data?.data || [];
         setRecords(data);
@@ -163,30 +163,30 @@ export function ChecklistProvider({ children }) {
   }
 
   // Save — API call
- async function saveRecord() {
-  setSaving(true);
-  try {
-    const payload = buildPayload();
-    console.log("Payload being sent:", JSON.stringify(payload, null, 2)); // debug
-    const res = await createChecklistApi(payload);
-    const newRecord = res.data?.data || res.data;
-    await fetchRecordsList();
-    setInfo(INITIAL_INFO);
-    resetItems(); // clear previous yn/score/remarks back to defaults
-    return { success: true, data: newRecord };
-  } catch (e) {
-    console.error("Save error:", e);
-    console.error("Error response:", e.response?.data); // actual backend error
-    return { success: false, error: e.message };
-  } finally {
-    setSaving(false);
+  async function saveRecord() {
+    setSaving(true);
+    try {
+      const payload = buildPayload();
+      console.log("Payload being sent:", JSON.stringify(payload, null, 2));
+      const res = await createChecklistApi(payload);
+      const newRecord = res.data?.data || res.data;
+      await fetchRecordsList();
+      setInfo(INITIAL_INFO);
+      resetItems();
+      return { success: true, data: newRecord };
+    } catch (e) {
+      console.error("Save error:", e);
+      console.error("Error response:", e.response?.data); // actual backend error
+      return { success: false, error: e.message };
+    } finally {
+      setSaving(false);
+    }
   }
-}
 
   // Reset items to default scores
   function resetItems() {
     setItems((prev) =>
-      prev.map((it) => ({ ...it, yn: "Yes", score: null, remarks: "" }))
+      prev.map((it) => ({ ...it, yn: "Yes", score: Number(it.max) || 0, remarks: "" }))
     );
   }
 
