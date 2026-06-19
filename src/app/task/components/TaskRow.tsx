@@ -242,7 +242,7 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChang
                       <Overlay onClose={() => setOpenTaskMenu(null)} />
                       <div className="fixed w-56 bg-white rounded-lg shadow-lg border border-gray-100 z-[60]" style={menuCoords} onClick={(e) => e.stopPropagation()}>
                         <div className="py-1">
-                          <MenuItem icon={Target} onClick={() => { setCalendarFor(task.id); setOpenTaskMenu(null); }}>Add deadline</MenuItem>
+                          <MenuItem icon={Target} onClick={() => { setEditDeadlineFor(task.id); setOpenTaskMenu(null); }}>Add deadline</MenuItem>
                           <MenuItem icon={CornerDownRight} onClick={() => indentTask(task.id, list.id)}>Indent</MenuItem>
                           <MenuItem icon={CornerDownRight} onClick={() => { const sub = newTask(""); updateTaskEverywhere(task.id, (t: any) => ({ ...t, subtasks: [...t.subtasks, sub] })); setEditingTaskId(sub.id); setOpenTaskMenu(null); }}>Add a subtask</MenuItem>
                           <MenuItem icon={Paperclip} onClick={() => { setOpenTaskMenu(null); document.getElementById(`att-input-${task.id}`)?.click(); }}>Add attachment</MenuItem>
@@ -273,7 +273,7 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChang
                 )}
                 {task.dueDate && (
                   <button onClick={() => setEditDeadlineFor(task.id)} className="px-2 py-1 rounded-full text-xs font-medium border flex items-center gap-1 transition-colors bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400">
-                    <Target size={12} className="text-gray-400" /> Due {dueLabel}{task.dueTime && ` · ${task.dueTime}`}
+                    <Target size={12} className="text-gray-400" /> Due {dueLabel}
                     <span onClick={(e) => { e.stopPropagation(); clearDue(task.id); }} className="ml-0.5 rounded-full hover:bg-black/10 p-0.5"><X size={10} /></span>
                   </button>
                 )}
@@ -398,7 +398,7 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChang
                     : "bg-white text-gray-600 border-gray-300"
                 }`}>
                   <Target size={10} className={isPastDate(task.dueDate) ? "text-red-500" : "text-gray-400"} />
-                  Due {dueLabel}{task.dueTime && ` · ${task.dueTime}`}
+                  Due {dueLabel}
                 </span>
               )}
               {task.repeat?.enabled && (
@@ -450,7 +450,7 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChang
                   <div className="py-1">
                     {depth === 0 ? (
                       <>
-                        <MenuItem icon={Target} onClick={() => { setCalendarFor(task.id); setOpenTaskMenu(null); }}>Add deadline</MenuItem>
+                        <MenuItem icon={Target} onClick={() => { setEditDeadlineFor(task.id); setOpenTaskMenu(null); }}>Add deadline</MenuItem>
                         <MenuItem icon={CornerDownRight} onClick={(e: any) => {
                           e.stopPropagation();
                           const sub = newTask("");
