@@ -123,7 +123,7 @@ export function ChecklistProvider({ children }) {
 
   function buildPayload() {
     // master1 wise group
-    const sectionMap = {};
+    const sectionMap: Record<string, any[]> = {};
     items.forEach((it) => {
       if (!it.master1) return; // placeholder items skip
       if (!sectionMap[it.master1]) {
