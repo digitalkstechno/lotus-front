@@ -20,44 +20,77 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 
 export const formatDueLabel = (task: any) => {
   if (!task.dueDate && !task.due) return null;
-  if (task.due === "today") return "Today";
-  if (task.due === "tomorrow") return "Tomorrow";
+  
+  let label = "";
+  let d: Date | null = null;
+  let showTime = false;
+  
   if (task.dueDate) {
-    const d = new Date(task.dueDate);
-    const today = new Date();
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    if (d.toDateString() === today.toDateString()) return "Today";
-    if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow";
-    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
-    
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+    d = new Date(task.dueDate);
+    if (typeof task.dueDate === "string" && task.dueDate.includes("T")) showTime = true;
+  } else if (task.due === "today") {
+    d = new Date();
+  } else if (task.due === "tomorrow") {
+    d = new Date();
+    d.setDate(d.getDate() + 1);
+  } else if (task.due === "yesterday") {
+    d = new Date();
+    d.setDate(d.getDate() - 1);
   }
-  return null;
+
+  if (d) {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    label = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+    
+    if (task.dueTime) {
+      let [hStr, mStr] = task.dueTime.split(":");
+      let h = Number(hStr);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      if (h === 0) h = 12;
+      label += ` ${String(h).padStart(2, '0')}:${mStr} ${ampm}`;
+    } else if (showTime) {
+      let h = d.getHours();
+      let m = d.getMinutes();
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      if (h === 0) h = 12;
+      label += ` ${pad(h)}:${pad(m)} ${ampm}`;
+    }
+  } else {
+    label = task.due;
+  }
+  
+  return label;
 };
 
 export const formatDate = (dateStr: string) => {
-  if (!dateStr || dateStr === "today" || dateStr === "tomorrow" || dateStr === "yesterday") {
-    return dateStr === "today" ? "Today" : dateStr === "tomorrow" ? "Tomorrow" : dateStr === "yesterday" ? "Yesterday" : null;
+  if (!dateStr) return null;
+  let d: Date;
+  let showTime = false;
+
+  if (dateStr === "today") d = new Date();
+  else if (dateStr === "tomorrow") { d = new Date(); d.setDate(d.getDate() + 1); }
+  else if (dateStr === "yesterday") { d = new Date(); d.setDate(d.getDate() - 1); }
+  else {
+    d = new Date(dateStr);
+    // If it's a full ISO string with time (e.g., contains 'T'), show the time
+    if (dateStr.includes("T")) showTime = true;
   }
-  const d = new Date(dateStr);
-  const today = new Date();
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  
-  if (d.toDateString() === today.toDateString()) return "Today";
-  if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow";
-  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
   
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  let formatted = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  
+  if (showTime) {
+    let h = d.getHours();
+    let m = d.getMinutes();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+    formatted += ` ${pad(h)}:${pad(m)} ${ampm}`;
+  }
+  
+  return formatted;
 };
 
 export const isPastDate = (dateStr: string) => {
