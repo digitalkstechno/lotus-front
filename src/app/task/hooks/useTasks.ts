@@ -123,17 +123,7 @@ export const useTasks = () => {
     }
   }, [loadingLists, hasMore, page, userId, dispatch]);
 
-  // Hydrate authUser if missing but token is present
-  useEffect(() => {
-    if (!authUser && userId) {
-      axiosInstance.get(`/user/${userId}`).then(res => {
-        const fetchedUser = res.data?.data;
-        if (fetchedUser) {
-          dispatch(setCredentials({ user: fetchedUser, token: localStorage.getItem("token") || "" }));
-        }
-      }).catch(console.error);
-    }
-  }, [authUser, userId, dispatch]);
+
 
   useEffect(() => {
     if (searchParams.get("newList") === "1") {

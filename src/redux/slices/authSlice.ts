@@ -6,8 +6,20 @@ interface AuthState {
   isAuthenticated: boolean;
 }
 
+const getUserFromStorage = () => {
+  if (typeof window !== "undefined") {
+    try {
+      const userStr = localStorage.getItem("user");
+      if (userStr) return JSON.parse(userStr);
+    } catch (e) {
+      console.error("Failed to parse user from localStorage", e);
+    }
+  }
+  return null;
+};
+
 const initialState: AuthState = {
-  user: null,
+  user: getUserFromStorage(),
   token: typeof window !== "undefined" ? localStorage.getItem("token") : null,
   isAuthenticated: !!(typeof window !== "undefined" && localStorage.getItem("token")),
 };
