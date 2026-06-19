@@ -211,15 +211,32 @@ const INITIAL_STAFF: Staff[] = [
 
 export default function StaffPage() {
   const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     try {
-      const user = JSON.parse(localStorage.getItem("user") || "null");
-      if (user?.role?.toLowerCase() !== "admin") router.replace("/task");
+      const userStr = localStorage.getItem("user");
+      const user = JSON.parse(userStr || "null");
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
+      const r = user?.role?.toLowerCase();
+      if (!["admin", "unit_head", "team_head"].includes(r)) {
+        router.replace("/task");
+      } else {
+        setCurrentUser(user);
+        if (r === "unit_head" && user.unit_id) {
+          setSelectedUnitId(user.unit_id);
+        } else if (r === "team_head") {
+          if (user.unit_id) setSelectedUnitId(user.unit_id);
+          if (user.team_id) setSelectedTeamId(user.team_id);
+        }
+      }
     } catch {
       router.replace("/task");
     }
-  }, []);
+  }, [router]);
 
   const dispatch = useDispatch<AppDispatch>();
   const { units } = useSelector((state: RootState) => state.units);
@@ -757,14 +774,26 @@ export default function StaffPage() {
     prefillTeamId?: string | null,
     prefillRole?: string | null,
   ) => {
+    let defaultUnit = prefillUnitId || "";
+    let defaultTeam = prefillTeamId || "";
+    let defaultRole = prefillRole || "staff";
+
+    if (currentUser?.role === "unit_head") {
+      defaultUnit = currentUser.unit_id || "";
+    } else if (currentUser?.role === "team_head") {
+      defaultUnit = currentUser.unit_id || "";
+      defaultTeam = currentUser.team_id || "";
+      defaultRole = "staff";
+    }
+
     setStaffForm({
       name: "",
       email: "",
       phone: "",
       password: "",
-      designation: prefillRole || "staff",
-      unitId: prefillUnitId || "",
-      teamId: prefillTeamId || "",
+      designation: defaultRole,
+      unitId: defaultUnit,
+      teamId: defaultTeam,
     });
     setDrawer({ type: "add-staff", title: "Add New Staff Member" });
   };
@@ -901,21 +930,27 @@ export default function StaffPage() {
   else if (selectedUnit) pageTitle = `Department: ${selectedUnit.name}`;
 
   const handleSelectUnit = (unitId: string) => {
+    if (currentUser?.role === "team_head" && unitId !== currentUser.unit_id) return;
+    if (currentUser?.role === "unit_head" && unitId !== currentUser.unit_id) return;
     setSelectedUnitId(unitId);
     setSelectedTeamId(null);
     setMobileSidebarOpen(false);
   };
   const handleSelectTeam = (unitId: string, teamId: string) => {
+    if (currentUser?.role === "team_head" && teamId !== currentUser.team_id) return;
+    if (currentUser?.role === "unit_head" && unitId !== currentUser.unit_id) return;
     setSelectedUnitId(unitId);
     setSelectedTeamId(teamId);
     setMobileSidebarOpen(false);
   };
   const handleSelectEntireOrg = () => {
+    if (currentUser?.role === "team_head" || currentUser?.role === "unit_head") return;
     setSelectedUnitId(null);
     setSelectedTeamId(null);
     setMobileSidebarOpen(false);
   };
   const handleSelectUnassigned = () => {
+    if (currentUser?.role === "team_head" || currentUser?.role === "unit_head") return;
     setSelectedUnitId("unassigned");
     setSelectedTeamId(null);
     setMobileSidebarOpen(false);
@@ -936,12 +971,14 @@ export default function StaffPage() {
             Organization
           </span>
         </div>
+        {currentUser?.role === "admin" && (
         <button
           onClick={triggerAddUnit}
           className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 cursor-pointer transition-colors border border-slate-200"
         >
           <Plus className="w-4 h-4" />
         </button>
+        )}
       </div>
 
       {/* Tree */}
@@ -1028,6 +1065,7 @@ export default function StaffPage() {
                       </div>
                     );
                   })}
+                  {currentUser?.role !== "team_head" && (
                   <div
                     onClick={() => triggerAddTeam(unit.id)}
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer text-[12px] text-emerald-500 hover:bg-emerald-50 font-medium transition-colors"
@@ -1035,6 +1073,7 @@ export default function StaffPage() {
                     <Plus className="w-3 h-3" />
                     <span>Add team</span>
                   </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1734,7 +1773,12 @@ export default function StaffPage() {
                                 className="w-full bg-gray-100 text-slate-800 border-0 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
                               >
                                 <option value="">Select Designation</option>
-                                {DESIGNATIONS.map((d) => (
+                                {DESIGNATIONS.filter(d => {
+                                  if (currentUser?.role === "admin") return true;
+                                  if (currentUser?.role === "unit_head") return ["team_head", "staff"].includes(d.value);
+                                  if (currentUser?.role === "team_head") return d.value === "staff";
+                                  return false;
+                                }).map((d) => (
                                   <option key={d.value} value={d.value}>
                                     {d.label}
                                   </option>
@@ -1847,6 +1891,7 @@ export default function StaffPage() {
                               </label>
                               <select
                                 value={staffForm.unitId}
+                                disabled={currentUser?.role === "unit_head" || currentUser?.role === "team_head"}
                                 onChange={(e) =>
                                   setStaffForm((p) => ({
                                     ...p,
@@ -1854,9 +1899,9 @@ export default function StaffPage() {
                                     teamId: "",
                                   }))
                                 }
-                                className="w-full bg-gray-100 text-slate-800 border-0 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                                className="w-full bg-gray-100 text-slate-800 border-0 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm disabled:opacity-40"
                               >
-                                <option value="">Unassigned</option>
+                                {currentUser?.role === "admin" && <option value="">Unassigned</option>}
                                 {units.map((u) => (
                                   <option key={u.id} value={u.id}>
                                     {u.name}
@@ -1870,7 +1915,7 @@ export default function StaffPage() {
                               </label>
                               <select
                                 value={staffForm.teamId}
-                                disabled={!staffForm.unitId}
+                                disabled={!staffForm.unitId || currentUser?.role === "team_head"}
                                 onChange={(e) =>
                                   setStaffForm((p) => ({
                                     ...p,
@@ -1879,7 +1924,7 @@ export default function StaffPage() {
                                 }
                                 className="w-full bg-gray-100 text-slate-800 border-0 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm disabled:opacity-40"
                               >
-                                <option value="">None</option>
+                                {currentUser?.role !== "team_head" && <option value="">None</option>}
                                 {staffFormTeams.map((t) => (
                                   <option key={t.id} value={t.id}>
                                     {t.name}

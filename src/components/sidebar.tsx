@@ -41,11 +41,15 @@ type UserInfo = {
   [key: string]: any;
 };
 
-const ADMIN_ONLY_IDS = ["staff", "checklist", "settings"];
+const ADMIN_ONLY_IDS = ["checklist", "settings"];
 
 const getVisibleNav = (role?: string) => {
-  if (role?.toLowerCase() === "admin") return PRIMARY_NAV;
-  return PRIMARY_NAV.filter((item) => !ADMIN_ONLY_IDS.includes(item.id));
+  const r = role?.toLowerCase();
+  if (r === "admin") return PRIMARY_NAV;
+  if (r === "unit_head" || r === "team_head") {
+    return PRIMARY_NAV.filter((item) => !ADMIN_ONLY_IDS.includes(item.id));
+  }
+  return PRIMARY_NAV.filter((item) => !ADMIN_ONLY_IDS.includes(item.id) && item.id !== "staff");
 };
 
 const getTokenPayload = (): UserInfo | null => {
