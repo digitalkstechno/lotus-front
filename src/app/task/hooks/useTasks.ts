@@ -3,13 +3,25 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { uid, newTask } from "../lib/utils";
 import { useOrgPeople } from "../hooks/useOrgPeople";
-import { fetchListsByUser, setListsLocally, fetchTasksForList, updateList as updateListThunk } from "../../../redux/slices/listSlice";
+import {
+  fetchListsByUser,
+  setListsLocally,
+  fetchTasksForList,
+  updateList as updateListThunk,
+} from "../../../redux/slices/listSlice";
 import { getRankBetween } from "../lib/lexoRank";
 import * as uiActions from "../../../redux/slices/taskUISlice";
 import { store } from "../../../redux/store";
 import axiosInstance from "../../../utils/axios";
 import { setCredentials } from "../../../redux/slices/authSlice";
-import { createTaskApi, updateTaskApi, uploadTaskFilesApi, removeTaskAttachmentApi, deleteTaskApi, reorderTasksApi } from "../../../services/taskService";
+import {
+  createTaskApi,
+  updateTaskApi,
+  uploadTaskFilesApi,
+  removeTaskAttachmentApi,
+  deleteTaskApi,
+  reorderTasksApi,
+} from "../../../services/taskService";
 import { reorderListsApi } from "../../../services/listService";
 
 export class MutableItem {
@@ -26,17 +38,31 @@ export class MutableItem {
     }
   }
 
-  get chosen() { return this._chosen; }
-  set chosen(val) { this._chosen = val; }
-  get selected() { return this._selected; }
-  set selected(val) { this._selected = val; }
-  get filtered() { return this._filtered; }
-  set filtered(val) { this._filtered = val; }
+  get chosen() {
+    return this._chosen;
+  }
+  set chosen(val) {
+    this._chosen = val;
+  }
+  get selected() {
+    return this._selected;
+  }
+  set selected(val) {
+    this._selected = val;
+  }
+  get filtered() {
+    return this._filtered;
+  }
+  set filtered(val) {
+    this._filtered = val;
+  }
 }
 
 export const makeMutable = (arr: any[]) => {
   if (!arr) return [];
-  return JSON.parse(JSON.stringify(arr)).map((item: any) => new MutableItem(item));
+  return JSON.parse(JSON.stringify(arr)).map(
+    (item: any) => new MutableItem(item),
+  );
 };
 
 export const unmakeMutable = (arr: any[]) => {
@@ -48,7 +74,11 @@ export const useTasks = () => {
   const dispatch = useDispatch();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { people: orgPeople, fetchPeople, loading: loadingPeople } = useOrgPeople();
+  const {
+    people: orgPeople,
+    fetchPeople,
+    loading: loadingPeople,
+  } = useOrgPeople();
 
   // Redux Selectors
   const authUser = useSelector((state: any) => state.auth.user);
@@ -59,36 +89,69 @@ export const useTasks = () => {
     try {
       const token = localStorage.getItem("token");
       if (token) userId = JSON.parse(atob(token.split(".")[1]))?.id;
-    } catch (e) { }
+    } catch (e) {}
   }
 
-  const { lists, loading: loadingLists, hasMore, currentPage: page } = useSelector((state: any) => state.lists);
+  const {
+    lists,
+    loading: loadingLists,
+    hasMore,
+    currentPage: page,
+  } = useSelector((state: any) => state.lists);
   const taskUI = useSelector((state: any) => state.taskUI);
 
   // Expose UI state
   const {
-    openAssignFor, openAttFor, collapsedCompleted, editingTaskId,
-    openListMenu, openTaskMenu, openMovePicker, renamingListId,
-    renameValue, newSubtaskInputs, addingList, newListName,
-    calendarFor, editDeadlineFor, timeFor, repeatFor,
-    tomorrowClickCount, dragData, dragOverTarget
+    openAssignFor,
+    openAttFor,
+    collapsedCompleted,
+    editingTaskId,
+    openListMenu,
+    openTaskMenu,
+    openMovePicker,
+    renamingListId,
+    renameValue,
+    newSubtaskInputs,
+    addingList,
+    newListName,
+    calendarFor,
+    editDeadlineFor,
+    timeFor,
+    repeatFor,
+    tomorrowClickCount,
+    dragData,
+    dragOverTarget,
   } = taskUI;
 
   // UI Dispatchers
-  const setOpenAssignFor = (val: string | null) => dispatch(uiActions.setOpenAssignFor(val));
-  const setOpenAttFor = (val: string | null) => dispatch(uiActions.setOpenAttFor(val));
-  const setEditingTaskId = (val: string | null) => dispatch(uiActions.setEditingTaskId(val));
-  const setOpenListMenu = (val: string | null) => dispatch(uiActions.setOpenListMenu(val));
-  const setOpenTaskMenu = (val: string | null) => dispatch(uiActions.setOpenTaskMenu(val));
-  const setOpenMovePicker = (val: string | null) => dispatch(uiActions.setOpenMovePicker(val));
-  const setRenameValue = (val: string) => dispatch(uiActions.setRenameValue(val));
-  const setAddingList = (val: boolean) => dispatch(uiActions.setAddingList(val));
-  const setNewListName = (val: string) => dispatch(uiActions.setNewListName(val));
-  const setCalendarFor = (val: string | null) => dispatch(uiActions.setCalendarFor(val));
-  const setEditDeadlineFor = (val: string | null) => dispatch(uiActions.setEditDeadlineFor(val));
-  const setTimeFor = (val: string | null) => dispatch(uiActions.setTimeFor(val));
-  const setRepeatFor = (val: string | null) => dispatch(uiActions.setRepeatFor(val));
-  const setDragOverTarget = (val: any) => dispatch(uiActions.setDragOverTarget(val));
+  const setOpenAssignFor = (val: string | null) =>
+    dispatch(uiActions.setOpenAssignFor(val));
+  const setOpenAttFor = (val: string | null) =>
+    dispatch(uiActions.setOpenAttFor(val));
+  const setEditingTaskId = (val: string | null) =>
+    dispatch(uiActions.setEditingTaskId(val));
+  const setOpenListMenu = (val: string | null) =>
+    dispatch(uiActions.setOpenListMenu(val));
+  const setOpenTaskMenu = (val: string | null) =>
+    dispatch(uiActions.setOpenTaskMenu(val));
+  const setOpenMovePicker = (val: string | null) =>
+    dispatch(uiActions.setOpenMovePicker(val));
+  const setRenameValue = (val: string) =>
+    dispatch(uiActions.setRenameValue(val));
+  const setAddingList = (val: boolean) =>
+    dispatch(uiActions.setAddingList(val));
+  const setNewListName = (val: string) =>
+    dispatch(uiActions.setNewListName(val));
+  const setCalendarFor = (val: string | null) =>
+    dispatch(uiActions.setCalendarFor(val));
+  const setEditDeadlineFor = (val: string | null) =>
+    dispatch(uiActions.setEditDeadlineFor(val));
+  const setTimeFor = (val: string | null) =>
+    dispatch(uiActions.setTimeFor(val));
+  const setRepeatFor = (val: string | null) =>
+    dispatch(uiActions.setRepeatFor(val));
+  const setDragOverTarget = (val: any) =>
+    dispatch(uiActions.setDragOverTarget(val));
   const setRenamingListId = (val: string | null) => {
     if (val) dispatch(uiActions.startRenameList({ id: val, name: "" }));
     else dispatch(uiActions.clearRenamingList());
@@ -106,25 +169,47 @@ export const useTasks = () => {
   // The custom dragData ref for instant access
   const dragDataRef = useRef<any>(null);
 
-  const fetchLists = useCallback((pageToFetch: number) => {
-    if (userId) dispatch(fetchListsByUser({ userId, page: pageToFetch, limit: 10, isChecked: true }) as any);
-  }, [userId, dispatch]);
+  const fetchLists = useCallback(
+    (pageToFetch: number) => {
+      if (userId)
+        dispatch(
+          fetchListsByUser({
+            userId,
+            page: pageToFetch,
+            limit: 10,
+            isChecked: true,
+          }) as any,
+        );
+    },
+    [userId, dispatch],
+  );
 
-  const fetchTasksForCurrentList = useCallback((listId: string, pageToFetch: number) => {
-    if (userId) {
-      const targetList = store.getState().lists.lists.find((l: any) => l.id === listId);
-      const sortBy = targetList ? targetList.sortBy : undefined;
-      dispatch(fetchTasksForList({ listId, userId, page: pageToFetch, limit: 20, sortBy }) as any);
-    }
-  }, [userId, dispatch]);
+  const fetchTasksForCurrentList = useCallback(
+    (listId: string, pageToFetch: number) => {
+      if (userId) {
+        const targetList = store
+          .getState()
+          .lists.lists.find((l: any) => l.id === listId);
+        const sortBy = targetList ? targetList.sortBy : undefined;
+        dispatch(
+          fetchTasksForList({
+            listId,
+            userId,
+            page: pageToFetch,
+            limit: 20,
+            sortBy,
+          }) as any,
+        );
+      }
+    },
+    [userId, dispatch],
+  );
 
   const loadMoreLists = useCallback(() => {
     if (!loadingLists && hasMore) {
       fetchLists(page + 1);
     }
   }, [loadingLists, hasMore, page, userId, dispatch]);
-
-
 
   useEffect(() => {
     if (searchParams.get("newList") === "1") {
@@ -136,7 +221,8 @@ export const useTasks = () => {
   // Data Setter Wrapper to avoid stale closures
   const setLists = (updater: any) => {
     const currentLists = store.getState().lists.lists;
-    const nextLists = typeof updater === "function" ? updater(currentLists) : updater;
+    const nextLists =
+      typeof updater === "function" ? updater(currentLists) : updater;
     dispatch(setListsLocally(nextLists));
   };
 
@@ -158,9 +244,14 @@ export const useTasks = () => {
         ...l,
         tasks: l.tasks.map((t: any) => {
           if (t.id === taskId) return updater(t);
-          return { ...t, subtasks: t.subtasks?.map((s: any) => (s.id === taskId ? updater(s) : s)) || [] };
+          return {
+            ...t,
+            subtasks:
+              t.subtasks?.map((s: any) => (s.id === taskId ? updater(s) : s)) ||
+              [],
+          };
         }),
-      }))
+      })),
     );
   };
 
@@ -170,19 +261,33 @@ export const useTasks = () => {
         ...l,
         tasks: l.tasks
           .filter((t: any) => t.id !== taskId)
-          .map((t: any) => ({ ...t, subtasks: t.subtasks?.filter((s: any) => s.id !== taskId) || [] })),
-      }))
+          .map((t: any) => ({
+            ...t,
+            subtasks: t.subtasks?.filter((s: any) => s.id !== taskId) || [],
+          })),
+      })),
     );
   };
 
-  const removeTaskFromTree = (allLists: any[], listId: string, taskId: string, parentId: string | null) =>
+  const removeTaskFromTree = (
+    allLists: any[],
+    listId: string,
+    taskId: string,
+    parentId: string | null,
+  ) =>
     allLists.map((l) => {
       if (l.id !== listId) return l;
-      if (!parentId) return { ...l, tasks: l.tasks.filter((t: any) => t.id !== taskId) };
+      if (!parentId)
+        return { ...l, tasks: l.tasks.filter((t: any) => t.id !== taskId) };
       return {
         ...l,
         tasks: l.tasks.map((t: any) =>
-          t.id === parentId ? { ...t, subtasks: t.subtasks?.filter((s: any) => s.id !== taskId) || [] } : t
+          t.id === parentId
+            ? {
+                ...t,
+                subtasks: t.subtasks?.filter((s: any) => s.id !== taskId) || [],
+              }
+            : t,
         ),
       };
     });
@@ -221,11 +326,19 @@ export const useTasks = () => {
             ...l,
             tasks: l.tasks.map((t: any) =>
               t.id === taskId
-                ? { ...t, completed: true, subtasks: t.subtasks?.map((s: any) => ({ ...s, completed: true })) || [] }
-                : t
+                ? {
+                    ...t,
+                    completed: true,
+                    subtasks:
+                      t.subtasks?.map((s: any) => ({
+                        ...s,
+                        completed: true,
+                      })) || [],
+                  }
+                : t,
             ),
           };
-        })
+        }),
       );
     } else {
       updateTaskEverywhere(taskId, (t) => ({ ...t, completed: !t.completed }));
@@ -233,27 +346,33 @@ export const useTasks = () => {
     syncToBackend(taskId, { status: !wasCompleted ? "Completed" : "Pending" });
   };
 
-  const toggleStar = (taskId: string) => updateTaskEverywhere(taskId, (t) => {
-    const newVal = !t.starred;
-    syncToBackend(taskId, { isStarred: newVal });
-    return { ...t, starred: newVal };
-  });
-  const setTitle = (taskId: string, title: string) => updateTaskEverywhere(taskId, (t) => ({ ...t, title }));
-  const setDetails = (taskId: string, details: string) => updateTaskEverywhere(taskId, (t) => ({ ...t, details }));
-  const setDate = (taskId: string, value: string | null) => updateTaskEverywhere(taskId, (t) => {
-    let dateStr = null;
-    if (value === "today") dateStr = new Date().toISOString();
-    else if (value === "tomorrow") {
-      const d = new Date(); d.setDate(d.getDate() + 1); dateStr = d.toISOString();
-    }
-    syncToBackend(taskId, { date: dateStr });
-    return { ...t, date: value };
-  });
+  const toggleStar = (taskId: string) =>
+    updateTaskEverywhere(taskId, (t) => {
+      const newVal = !t.starred;
+      syncToBackend(taskId, { isStarred: newVal });
+      return { ...t, starred: newVal };
+    });
+  const setTitle = (taskId: string, title: string) =>
+    updateTaskEverywhere(taskId, (t) => ({ ...t, title }));
+  const setDetails = (taskId: string, details: string) =>
+    updateTaskEverywhere(taskId, (t) => ({ ...t, details }));
+  const setDate = (taskId: string, value: string | null) =>
+    updateTaskEverywhere(taskId, (t) => {
+      let dateStr = null;
+      if (value === "today") dateStr = new Date().toISOString();
+      else if (value === "tomorrow") {
+        const d = new Date();
+        d.setDate(d.getDate() + 1);
+        dateStr = d.toISOString();
+      }
+      syncToBackend(taskId, { date: dateStr });
+      return { ...t, date: value };
+    });
   const setDueDate = (taskId: string, dateStr: string | null) => {
     updateTaskEverywhere(taskId, (t) => {
       let finalDate = dateStr;
       if (dateStr && t.dueTime) {
-        const [h, m] = t.dueTime.split(':');
+        const [h, m] = t.dueTime.split(":");
         const d = new Date(dateStr);
         d.setHours(Number(h), Number(m), 0, 0);
         finalDate = d.toISOString();
@@ -263,12 +382,16 @@ export const useTasks = () => {
     });
     dispatch(uiActions.resetTomorrowClick(taskId));
   };
-  const setDueDateAndTime = (taskId: string, dateStr: string, timeStr: string | null | undefined) => {
+  const setDueDateAndTime = (
+    taskId: string,
+    dateStr: string,
+    timeStr: string | null | undefined,
+  ) => {
     updateTaskEverywhere(taskId, (t) => {
       let finalDate = dateStr;
       const timeToUse = timeStr !== undefined ? timeStr : t.dueTime;
       if (dateStr && timeToUse) {
-        const [h, m] = timeToUse.split(':');
+        const [h, m] = timeToUse.split(":");
         const d = new Date(dateStr);
         d.setHours(Number(h), Number(m), 0, 0);
         finalDate = d.toISOString();
@@ -278,29 +401,33 @@ export const useTasks = () => {
     });
     dispatch(uiActions.resetTomorrowClick(taskId));
   };
-  const setDueTime = (taskId: string, time: string | null) => updateTaskEverywhere(taskId, (t) => {
-    let finalDate = t.dueDate || new Date().toISOString();
-    if (time) {
-      const [h, m] = time.split(':');
-      const d = new Date(finalDate);
-      d.setHours(Number(h), Number(m), 0, 0);
-      finalDate = d.toISOString();
-    }
-    syncToBackend(taskId, { isTime: !!time, deadline: finalDate });
-    return { ...t, dueTime: time, dueDate: finalDate };
-  });
-  const setRepeat = (taskId: string, repeat: any) => updateTaskEverywhere(taskId, (t) => {
-    syncToBackend(taskId, { repeat });
-    return { ...t, repeat };
-  });
-  const clearDue = (taskId: string) => updateTaskEverywhere(taskId, (t) => {
-    syncToBackend(taskId, { deadline: null });
-    return { ...t, dueDate: null, dueTime: null };
-  });
-  const setAssign = (taskId: string, assign: any) => updateTaskEverywhere(taskId, (t) => {
-    syncToBackend(taskId, { assigned_to_user: assign?.id || null });
-    return { ...t, assign };
-  });
+  const setDueTime = (taskId: string, time: string | null) =>
+    updateTaskEverywhere(taskId, (t) => {
+      let finalDate = t.dueDate || new Date().toISOString();
+      if (time) {
+        const [h, m] = time.split(":");
+        const d = new Date(finalDate);
+        d.setHours(Number(h), Number(m), 0, 0);
+        finalDate = d.toISOString();
+      }
+      syncToBackend(taskId, { isTime: !!time, deadline: finalDate });
+      return { ...t, dueTime: time, dueDate: finalDate };
+    });
+  const setRepeat = (taskId: string, repeat: any) =>
+    updateTaskEverywhere(taskId, (t) => {
+      syncToBackend(taskId, { repeat });
+      return { ...t, repeat };
+    });
+  const clearDue = (taskId: string) =>
+    updateTaskEverywhere(taskId, (t) => {
+      syncToBackend(taskId, { deadline: null });
+      return { ...t, dueDate: null, dueTime: null };
+    });
+  const setAssign = (taskId: string, assign: any) =>
+    updateTaskEverywhere(taskId, (t) => {
+      syncToBackend(taskId, { assigned_to_user: assign?.id || null });
+      return { ...t, assign };
+    });
   const deleteTaskById = async (taskId: string) => {
     if (taskId.length >= 24) {
       try {
@@ -309,7 +436,7 @@ export const useTasks = () => {
         console.error("Failed to delete task", err);
       }
     }
-    
+
     setLists((prev: any) => {
       const found = findTaskEverywhere(taskId, prev);
       if (!found) return prev;
@@ -327,11 +454,14 @@ export const useTasks = () => {
           // Deleting a subtask
           return {
             ...l,
-            tasks: l.tasks.map((t: any) => 
-              t.id === found.parentId 
-                ? { ...t, subtasks: t.subtasks.filter((s: any) => s.id !== taskId) }
-                : t
-            )
+            tasks: l.tasks.map((t: any) =>
+              t.id === found.parentId
+                ? {
+                    ...t,
+                    subtasks: t.subtasks.filter((s: any) => s.id !== taskId),
+                  }
+                : t,
+            ),
           };
         }
       });
@@ -359,7 +489,7 @@ export const useTasks = () => {
             assigned_by: authUser._id || authUser.id,
             isStarred: found.task.starred || false,
             repeat: found.task.repeat || { enabled: false },
-            rank: found.task.rank || undefined
+            rank: found.task.rank || undefined,
           };
 
           // Optimistically remove isNew flag
@@ -370,7 +500,12 @@ export const useTasks = () => {
             const createdTask = res.data;
             if (createdTask && createdTask._id) {
               // Replace temporary ID with MongoDB ID and add rank
-              updateTaskEverywhere(editingTaskId, (t) => ({ ...t, id: createdTask._id, _id: createdTask._id, rank: createdTask.rank || t.rank }));
+              updateTaskEverywhere(editingTaskId, (t) => ({
+                ...t,
+                id: createdTask._id,
+                _id: createdTask._id,
+                rank: createdTask.rank || t.rank,
+              }));
             }
           } catch (err) {
             console.error("Failed to create task", err);
@@ -384,7 +519,7 @@ export const useTasks = () => {
           try {
             await updateTaskApi(editingTaskId, {
               title: found.task.title,
-              description: found.task.details || ""
+              description: found.task.details || "",
             });
           } catch (err) {
             console.error("Failed to update task text", err);
@@ -395,7 +530,11 @@ export const useTasks = () => {
     dispatch(uiActions.closeAllEditing());
   };
 
-  const uploadTaskAttachment = async (taskId: string, file: File, tempId: string) => {
+  const uploadTaskAttachment = async (
+    taskId: string,
+    file: File,
+    tempId: string,
+  ) => {
     let finalTaskId = taskId;
     if (taskId.length < 24) {
       const currentLists = store.getState().lists.lists;
@@ -411,25 +550,41 @@ export const useTasks = () => {
           assigned_by: authUser._id || authUser.id,
           isStarred: found.task.starred || false,
           repeat: found.task.repeat || { enabled: false },
-          order: found.task.order || 0
+          order: found.task.order || 0,
         };
         try {
           const res = await createTaskApi(payload);
           const createdTask = res.data;
           if (createdTask && createdTask._id) {
             finalTaskId = createdTask._id;
-            updateTaskEverywhere(taskId, (t: any) => ({ ...t, id: createdTask._id, _id: createdTask._id, isNew: false, rank: createdTask.rank || t.rank }));
+            updateTaskEverywhere(taskId, (t: any) => ({
+              ...t,
+              id: createdTask._id,
+              _id: createdTask._id,
+              isNew: false,
+              rank: createdTask.rank || t.rank,
+            }));
           } else {
             throw new Error("Failed to create task before uploading");
           }
         } catch (err) {
           console.error("Failed to auto-save task", err);
-          updateTaskEverywhere(taskId, (t: any) => ({ ...t, attachments: (t.attachments || []).filter((a: any) => a.id !== tempId) }));
+          updateTaskEverywhere(taskId, (t: any) => ({
+            ...t,
+            attachments: (t.attachments || []).filter(
+              (a: any) => a.id !== tempId,
+            ),
+          }));
           return;
         }
       } else {
         // Not a new task or missing authUser, just cancel
-        updateTaskEverywhere(taskId, (t: any) => ({ ...t, attachments: (t.attachments || []).filter((a: any) => a.id !== tempId) }));
+        updateTaskEverywhere(taskId, (t: any) => ({
+          ...t,
+          attachments: (t.attachments || []).filter(
+            (a: any) => a.id !== tempId,
+          ),
+        }));
         return;
       }
     }
@@ -442,10 +597,10 @@ export const useTasks = () => {
       if (updatedTask && updatedTask.file) {
         const attachments = updatedTask.file.map((f: string, idx: number) => ({
           id: `att-${updatedTask._id || updatedTask.id}-${idx}`,
-          name: f.split('/').pop() || f,
+          name: f.split("/").pop() || f,
           url: `${process.env.NEXT_PUBLIC_IMAGE_URL || "http://localhost:5000"}/${f}`,
           type: "unknown",
-          rawPath: f
+          rawPath: f,
         }));
         // Update everywhere using finalTaskId (since we replaced it in state)
         updateTaskEverywhere(finalTaskId, (t: any) => ({ ...t, attachments }));
@@ -453,13 +608,19 @@ export const useTasks = () => {
     } catch (err) {
       console.error("Failed to upload attachment", err);
       // Remove optimistic update
-      updateTaskEverywhere(finalTaskId, (t: any) => ({ ...t, attachments: (t.attachments || []).filter((a: any) => a.id !== tempId) }));
+      updateTaskEverywhere(finalTaskId, (t: any) => ({
+        ...t,
+        attachments: (t.attachments || []).filter((a: any) => a.id !== tempId),
+      }));
     }
   };
 
   const removeTaskAttachment = async (taskId: string, att: any) => {
     // Optimistic remove
-    updateTaskEverywhere(taskId, (t: any) => ({ ...t, attachments: (t.attachments || []).filter((a: any) => a.id !== att.id) }));
+    updateTaskEverywhere(taskId, (t: any) => ({
+      ...t,
+      attachments: (t.attachments || []).filter((a: any) => a.id !== att.id),
+    }));
     if (!att.rawPath) return; // Cannot delete from backend if it doesn't have rawPath
     try {
       await removeTaskAttachmentApi(taskId, att.rawPath);
@@ -479,7 +640,9 @@ export const useTasks = () => {
     const currentLists = store.getState().lists.lists;
     const targetList = currentLists.find((l: any) => l.id === listId);
     if (targetList && targetList.tasks.length > 0) {
-      maxOrder = Math.max(...targetList.tasks.map((task: any) => task.order || 0));
+      maxOrder = Math.max(
+        ...targetList.tasks.map((task: any) => task.order || 0),
+      );
     }
     t.order = maxOrder + 1;
 
@@ -488,11 +651,22 @@ export const useTasks = () => {
       t.assign = {
         id: authUser._id || authUser.id,
         name: authUser.fullName || authUser.name,
-        role: uRole === "unit_head" ? "Unit Head" : uRole === "team_head" ? "Team Head" : uRole === "admin" ? "Admin" : "Staff"
+        role:
+          uRole === "unit_head"
+            ? "Unit Head"
+            : uRole === "team_head"
+              ? "Team Head"
+              : uRole === "admin"
+                ? "Admin"
+                : "Staff",
       };
     }
 
-    setLists((prev: any) => prev.map((l: any) => (l.id === listId ? { ...l, tasks: [...l.tasks, t] } : l)));
+    setLists((prev: any) =>
+      prev.map((l: any) =>
+        l.id === listId ? { ...l, tasks: [...l.tasks, t] } : l,
+      ),
+    );
     setEditingTaskId(t.id);
     setAddingList(false);
     setEditDeadlineFor(null);
@@ -503,14 +677,16 @@ export const useTasks = () => {
     if (!listId) return;
     const t = newTask("") as any;
     t.listId = listId;
-    t.starred = true;          // ← default starred
+    t.starred = true; // ← default starred
     t.isNew = true;
 
     let maxOrder = -1;
     const currentLists = store.getState().lists.lists;
     const targetList = currentLists.find((l: any) => l.id === listId);
     if (targetList && targetList.tasks.length > 0) {
-      maxOrder = Math.max(...targetList.tasks.map((task: any) => task.order || 0));
+      maxOrder = Math.max(
+        ...targetList.tasks.map((task: any) => task.order || 0),
+      );
     }
     t.order = maxOrder + 1;
 
@@ -519,11 +695,22 @@ export const useTasks = () => {
       t.assign = {
         id: authUser._id || authUser.id,
         name: authUser.fullName || authUser.name,
-        role: uRole === "unit_head" ? "Unit Head" : uRole === "team_head" ? "Team Head" : uRole === "admin" ? "Admin" : "Staff"
+        role:
+          uRole === "unit_head"
+            ? "Unit Head"
+            : uRole === "team_head"
+              ? "Team Head"
+              : uRole === "admin"
+                ? "Admin"
+                : "Staff",
       };
     }
 
-    setLists((prev: any) => prev.map((l: any) => (l.id === listId ? { ...l, tasks: [...l.tasks, t] } : l)));
+    setLists((prev: any) =>
+      prev.map((l: any) =>
+        l.id === listId ? { ...l, tasks: [...l.tasks, t] } : l,
+      ),
+    );
     setEditingTaskId(t.id);
     setAddingList(false);
     setEditDeadlineFor(null);
@@ -541,7 +728,10 @@ export const useTasks = () => {
 
     // Optimistic UI update
     const tempSubtask = newTask(title);
-    updateTaskEverywhere(parentId, (t) => ({ ...t, subtasks: [...(t.subtasks || []), tempSubtask] }));
+    updateTaskEverywhere(parentId, (t) => ({
+      ...t,
+      subtasks: [...(t.subtasks || []), tempSubtask],
+    }));
     dispatch(uiActions.setNewSubtaskInput({ parentId, value: "" }));
 
     // Backend creation
@@ -550,7 +740,7 @@ export const useTasks = () => {
         title,
         list: parentFound.listId,
         parent_id: parentId,
-        assigned_to_user: authUser?._id || authUser?.id || null
+        assigned_to_user: authUser?._id || authUser?.id || null,
       };
       const response = await createTaskApi(payload);
       const createdSubtask = response.data?.data || response.data;
@@ -558,7 +748,14 @@ export const useTasks = () => {
       if (createdSubtask && createdSubtask._id) {
         updateTaskEverywhere(parentId, (t) => {
           const newSubtasks = t.subtasks.map((s: any) =>
-            s.id === tempSubtask.id ? { ...s, id: createdSubtask._id, _id: createdSubtask._id, rank: createdSubtask.rank || s.rank } : s
+            s.id === tempSubtask.id
+              ? {
+                  ...s,
+                  id: createdSubtask._id,
+                  _id: createdSubtask._id,
+                  rank: createdSubtask.rank || s.rank,
+                }
+              : s,
           );
           return { ...t, subtasks: newSubtasks };
         });
@@ -568,28 +765,47 @@ export const useTasks = () => {
     }
   };
 
-  const moveTaskToList = (taskId: string, parentId: string | null, targetListId: string) => {
+  const moveTaskToList = (
+    taskId: string,
+    parentId: string | null,
+    targetListId: string,
+  ) => {
     const currentLists = store.getState().lists.lists;
     const found = findTaskEverywhere(taskId, currentLists);
     if (!found) return;
     const task = { ...found.task, subtasks: found.task.subtasks || [] };
     setLists((prev: any) => {
       let next = removeTaskFromTree(prev, found.listId, taskId, found.parentId);
-      next = next.map((l: any) => (l.id === targetListId ? { ...l, tasks: [...l.tasks, task] } : l));
+      next = next.map((l: any) =>
+        l.id === targetListId ? { ...l, tasks: [...l.tasks, task] } : l,
+      );
       return next;
     });
     setOpenTaskMenu(null);
     setOpenMovePicker(null);
-    
+
     // Sync backend: set new list_id, remove parent_id (since it moves to root of new list), update order
-    const targetList = store.getState().lists.lists.find((l: any) => l.id === targetListId);
+    const targetList = store
+      .getState()
+      .lists.lists.find((l: any) => l.id === targetListId);
     const newOrder = targetList ? targetList.tasks.length : 0;
-    syncToBackend(taskId, { list: targetListId, parent_id: null, order: newOrder });
+    syncToBackend(taskId, {
+      list: targetListId,
+      parent_id: null,
+      order: newOrder,
+    });
   };
 
-  const moveTaskToNewList = (taskId: string, parentId: string | null, newListNameVal: string) => {
+  const moveTaskToNewList = (
+    taskId: string,
+    parentId: string | null,
+    newListNameVal: string,
+  ) => {
     const id = uid();
-    setLists((prev: any) => [...prev, { id, name: newListNameVal, sortBy: "deadline", tasks: [] }]);
+    setLists((prev: any) => [
+      ...prev,
+      { id, name: newListNameVal, sortBy: "deadline", tasks: [] },
+    ]);
     setTimeout(() => moveTaskToList(taskId, parentId, id), 0);
   };
 
@@ -613,7 +829,10 @@ export const useTasks = () => {
     }
   };
 
-  const updateList = (listId: string, fn: (l: any) => any) => setLists((prev: any) => prev.map((l: any) => (l.id === listId ? fn(l) : l)));
+  const updateList = (listId: string, fn: (l: any) => any) =>
+    setLists((prev: any) =>
+      prev.map((l: any) => (l.id === listId ? fn(l) : l)),
+    );
 
   const setSortBy = (listId: string, value: string) => {
     // 1. Update local Redux state immediately (optimistic)
@@ -623,7 +842,15 @@ export const useTasks = () => {
     setOpenListMenu(null);
     // 3. Re-fetch tasks for this list with the new sortBy so order is applied from server
     if (userId) {
-      dispatch(fetchTasksForList({ listId, userId, page: 1, limit: 20, sortBy: value }) as any);
+      dispatch(
+        fetchTasksForList({
+          listId,
+          userId,
+          page: 1,
+          limit: 20,
+          sortBy: value,
+        }) as any,
+      );
     }
   };
 
@@ -654,7 +881,10 @@ export const useTasks = () => {
       ...l,
       tasks: l.tasks
         .filter((t: any) => !t.completed)
-        .map((t: any) => ({ ...t, subtasks: t.subtasks?.filter((s: any) => !s.completed) || [] })),
+        .map((t: any) => ({
+          ...t,
+          subtasks: t.subtasks?.filter((s: any) => !s.completed) || [],
+        })),
     }));
     setOpenListMenu(null);
   };
@@ -663,64 +893,96 @@ export const useTasks = () => {
     const currentUI = store.getState().taskUI;
     const name = currentUI.newListName.trim();
     if (!name) return;
-    setLists((prev: any) => [...prev, { id: uid(), name, sortBy: "my-order", tasks: [] }]);
+    setLists((prev: any) => [
+      ...prev,
+      { id: uid(), name, sortBy: "my-order", tasks: [] },
+    ]);
     setNewListName("");
     setAddingList(false);
   };
 
-  const toggleCompletedSection = (listId: string) => dispatch(uiActions.toggleCollapsedCompleted(listId));
+  const toggleCompletedSection = (listId: string) =>
+    dispatch(uiActions.toggleCollapsedCompleted(listId));
 
   // --- SortableJS Handlers ---
   const handleListGroupChange = (newLists: any[]) => {
     setLists(newLists);
   };
 
-  const handleTaskGroupChange = (listId: string, parentId: string | null, newItems: any[]) => {
+  const handleTaskGroupChange = (
+    listId: string,
+    parentId: string | null,
+    newItems: any[],
+  ) => {
     setLists((prev: any) => {
       if (!parentId) {
-        return prev.map((l: any) => l.id === listId ? { ...l, tasks: newItems } : l);
+        return prev.map((l: any) =>
+          l.id === listId ? { ...l, tasks: newItems } : l,
+        );
       } else {
-        return prev.map((l: any) => l.id === listId ? {
-          ...l,
-          tasks: l.tasks.map((t: any) => t.id === parentId ? { ...t, subtasks: newItems } : t)
-        } : l);
+        return prev.map((l: any) =>
+          l.id === listId
+            ? {
+                ...l,
+                tasks: l.tasks.map((t: any) =>
+                  t.id === parentId ? { ...t, subtasks: newItems } : t,
+                ),
+              }
+            : l,
+        );
       }
     });
   };
 
-  const syncSortToBackend = async (taskId: string, payload: any, fromListId?: string | null) => {
-    console.log("[DnD] syncSortToBackend CALLED", { taskId, payload, fromListId });
+  const syncSortToBackend = async (
+    taskId: string,
+    payload: any,
+    fromListId?: string | null,
+  ) => {
+    console.log("[DnD] syncSortToBackend CALLED", {
+      taskId,
+      payload,
+      fromListId,
+    });
     if (taskId.length < 24) return;
     try {
       await updateTaskApi(taskId, payload);
-      
+
       const listsToRefresh = new Set<string>();
       if (payload.list) listsToRefresh.add(payload.list);
-      if (fromListId && fromListId !== payload.list) listsToRefresh.add(fromListId);
+      if (fromListId && fromListId !== payload.list)
+        listsToRefresh.add(fromListId);
 
       for (const listId of listsToRefresh) {
         const currentLists = store.getState().lists.lists;
         const targetList = currentLists.find((l: any) => l.id === listId);
         const sortBy = targetList?.sortBy;
-        dispatch(fetchTasksForList({ listId, userId, page: 1, limit: 20, sortBy }) as any);
+        dispatch(
+          fetchTasksForList({
+            listId,
+            userId,
+            page: 1,
+            limit: 20,
+            sortBy,
+          }) as any,
+        );
       }
     } catch (err) {
       console.error("[DnD] syncSortToBackend FAILED", err);
     }
   };
 
-
   const onSortEnd = (evt: any) => {
     console.log("[DnD] ====== onSortEnd FIRED ======");
     const taskId = evt.item?.dataset?.taskId;
-    
-    const fromWrapper = evt.from?.closest?.("[data-list-id]");
-    const toWrapper   = evt.to?.closest?.("[data-list-id]");
 
-    const fromListId   = fromWrapper?.dataset?.listId   || null;
+    const fromWrapper = evt.from?.closest?.("[data-list-id]");
+    const toWrapper = evt.to?.closest?.("[data-list-id]");
+
+    const fromListId = fromWrapper?.dataset?.listId || null;
     const fromParentId = fromWrapper?.dataset?.parentId || null;
 
-    const toListId   = toWrapper?.dataset?.listId   || null;
+    const toListId = toWrapper?.dataset?.listId || null;
     const toParentId = toWrapper?.dataset?.parentId || null;
 
     if (!taskId || taskId.length < 24 || !toListId) return;
@@ -739,19 +1001,28 @@ export const useTasks = () => {
       }
 
       let newItems = [...items];
-      const sameContainer = fromListId === toListId && fromParentId === toParentId;
-      
-      // react-sortablejs usually updates Redux before onEnd. 
+      const sameContainer =
+        fromListId === toListId && fromParentId === toParentId;
+
+      // react-sortablejs usually updates Redux before onEnd.
       // If the array is already updated, items[evt.newIndex].id will match taskId.
-      const isAlreadyUpdated = newItems[evt.newIndex]?.id === taskId || newItems[evt.newIndex]?._id === taskId;
+      const isAlreadyUpdated =
+        newItems[evt.newIndex]?.id === taskId ||
+        newItems[evt.newIndex]?._id === taskId;
 
       if (!isAlreadyUpdated) {
         if (sameContainer) {
           const [movedItem] = newItems.splice(evt.oldIndex, 1);
           newItems.splice(evt.newIndex, 0, movedItem);
         } else {
-          const found = findTaskEverywhere(taskId, store.getState().lists.lists);
-          newItems.splice(evt.newIndex, 0, { id: taskId, rank: found?.task?.rank || "" });
+          const found = findTaskEverywhere(
+            taskId,
+            store.getState().lists.lists,
+          );
+          newItems.splice(evt.newIndex, 0, {
+            id: taskId,
+            rank: found?.task?.rank || "",
+          });
         }
       }
 
@@ -761,28 +1032,52 @@ export const useTasks = () => {
       console.log("[useTasks onSortEnd] isAlreadyUpdated:", isAlreadyUpdated);
       console.log("[useTasks onSortEnd] prevItem:", prevItem);
       console.log("[useTasks onSortEnd] nextItem:", nextItem);
-      console.log("[useTasks onSortEnd] prevRank:", prevItem?.rank, "nextRank:", nextItem?.rank);
+      console.log(
+        "[useTasks onSortEnd] prevRank:",
+        prevItem?.rank,
+        "nextRank:",
+        nextItem?.rank,
+      );
 
       const newRank = getRankBetween(prevItem?.rank, nextItem?.rank);
       console.log("[useTasks onSortEnd] Calculated newRank:", newRank);
 
       // Local state update is handled by handleTaskGroupChange automatically if same container
       // but if we are moving, we might need a Redux refresh.
-      
+
       syncSortToBackend(
         taskId,
         {
           list: toListId,
           parent_id: toParentId,
-          rank: newRank
+          rank: newRank,
         },
-        fromListId
+        fromListId,
       );
     }, 100);
   };
 
+  // const onListSortEnd = (evt: any) => {
+  //   console.log("[DnD] ====== onListSortEnd FIRED ======");
+  //   const currentLists = store.getState().lists.lists;
+  //   const newLists = [...currentLists];
+  //   const [movedList] = newLists.splice(evt.oldIndex, 1);
+  //   newLists.splice(evt.newIndex, 0, movedList);
+
+  //   const prevItem = newLists[evt.newIndex - 1];
+  //   const nextItem = newLists[evt.newIndex + 1];
+
+  //   const { getRankBetween } = require("../lib/lexoRank");
+  //   const newRank = getRankBetween(prevItem?.rank, nextItem?.rank);
+
+  //   updateListThunk({ id: movedList.id, data: { rank: newRank } })(
+  //     dispatch,
+  //     store.getState,
+  //     undefined,
+  //   );
+  // };
+
   const onListSortEnd = (evt: any) => {
-    console.log("[DnD] ====== onListSortEnd FIRED ======");
     const currentLists = store.getState().lists.lists;
     const newLists = [...currentLists];
     const [movedList] = newLists.splice(evt.oldIndex, 1);
@@ -794,10 +1089,18 @@ export const useTasks = () => {
     const { getRankBetween } = require("../lib/lexoRank");
     const newRank = getRankBetween(prevItem?.rank, nextItem?.rank);
 
-    updateListThunk({ id: movedList.id, data: { rank: newRank } })(dispatch, store.getState, undefined);
+    // Update local Redux state immediately (optimistic)
+    setLists(
+      newLists.map((l: any) =>
+        l.id === movedList.id ? { ...l, rank: newRank } : l,
+      ),
+    );
+
+    // Persist to backend via reorder API
+    reorderListsApi([{ id: movedList.id, rank: newRank } as any]).catch(
+      console.error,
+    );
   };
-
-
 
   const dropAssign = (e: any, taskId: string) => {
     e.preventDefault();
@@ -809,18 +1112,26 @@ export const useTasks = () => {
     dragDataRef.current = null;
   };
 
-  const promoteToMainTask = (taskId: string, parentId: string | null, listId: string) => {
+  const promoteToMainTask = (
+    taskId: string,
+    parentId: string | null,
+    listId: string,
+  ) => {
     const currentLists = store.getState().lists.lists;
     const found = findTaskEverywhere(taskId, currentLists);
     if (!found) return;
     const task = { ...found.task, subtasks: found.task.subtasks || [] };
     setLists((prev: any) => {
       let next = removeTaskFromTree(prev, listId, taskId, parentId);
-      next = next.map((l: any) => (l.id === listId ? { ...l, tasks: [...l.tasks, task] } : l));
+      next = next.map((l: any) =>
+        l.id === listId ? { ...l, tasks: [...l.tasks, task] } : l,
+      );
       return next;
     });
     setEditingTaskId(null);
-    const targetList = store.getState().lists.lists.find((l: any) => l.id === listId);
+    const targetList = store
+      .getState()
+      .lists.lists.find((l: any) => l.id === listId);
     syncToBackend(taskId, { parent_id: null });
   };
 
@@ -835,33 +1146,115 @@ export const useTasks = () => {
         const newTasks = [...l.tasks];
         newTasks.splice(idx, 1);
         const newOrder = prevTask.subtasks?.length || 0;
-        newTasks[idx - 1] = { ...prevTask, subtasks: [...(prevTask.subtasks || []), taskToIndent] };
+        newTasks[idx - 1] = {
+          ...prevTask,
+          subtasks: [...(prevTask.subtasks || []), taskToIndent],
+        };
 
-        syncToBackend(taskId, { parent_id: prevTask.id || prevTask._id, order: newOrder });
+        syncToBackend(taskId, {
+          parent_id: prevTask.id || prevTask._id,
+          order: newOrder,
+        });
         return { ...l, tasks: newTasks };
-      })
+      }),
     );
     setEditingTaskId(null);
     setOpenTaskMenu(null);
   };
 
-  const getTask = (taskId: string) => findTaskEverywhere(taskId, store.getState().lists.lists)?.task;
+  const getTask = (taskId: string) =>
+    findTaskEverywhere(taskId, store.getState().lists.lists)?.task;
 
   return {
-    lists, setLists, orgPeople, loadMoreLists, loadingLists, hasMore,
-    openAssignFor, setOpenAssignFor, openAttFor, setOpenAttFor,
-    collapsedCompleted, setCollapsedCompleted, editingTaskId, setEditingTaskId,
-    openListMenu, setOpenListMenu, openTaskMenu, setOpenTaskMenu, openMovePicker, setOpenMovePicker,
-    renamingListId, setRenamingListId, renameValue, setRenameValue,
-    newSubtaskInputs, setNewSubtaskInputs, addingList, setAddingList, newListName, setNewListName,
-    calendarFor, setCalendarFor, editDeadlineFor, setEditDeadlineFor, timeFor, setTimeFor, repeatFor, setRepeatFor,
-    tomorrowClickCount, setTomorrowClickCount, dragData: dragDataRef, dragOverTarget, setDragOverTarget,
-    findTaskEverywhere, updateTaskEverywhere, removeTaskEverywhere, removeTaskFromTree,
-    toggleComplete, toggleStar, setTitle, setDetails, setDate, setDueDate, setDueTime, setDueDateAndTime, setRepeat, clearDue,
-    setAssign, deleteTaskById, closeEditing, uploadTaskAttachment, removeTaskAttachment, addTaskToList, addStarredTaskToList, addSubtask, moveTaskToList, moveTaskToNewList,
-    handleTomorrowClick, handleTodayClick, updateList, setSortBy, startRename, commitRename, deleteList,
-    deleteAllCompleted, addList, toggleCompletedSection, dropAssign, promoteToMainTask, indentTask, getTask,
-    fetchTasksForCurrentList, fetchPeople, loadingPeople,
-    handleListGroupChange, handleTaskGroupChange, onSortEnd, onListSortEnd, makeMutable, unmakeMutable
+    lists,
+    setLists,
+    orgPeople,
+    loadMoreLists,
+    loadingLists,
+    hasMore,
+    openAssignFor,
+    setOpenAssignFor,
+    openAttFor,
+    setOpenAttFor,
+    collapsedCompleted,
+    setCollapsedCompleted,
+    editingTaskId,
+    setEditingTaskId,
+    openListMenu,
+    setOpenListMenu,
+    openTaskMenu,
+    setOpenTaskMenu,
+    openMovePicker,
+    setOpenMovePicker,
+    renamingListId,
+    setRenamingListId,
+    renameValue,
+    setRenameValue,
+    newSubtaskInputs,
+    setNewSubtaskInputs,
+    addingList,
+    setAddingList,
+    newListName,
+    setNewListName,
+    calendarFor,
+    setCalendarFor,
+    editDeadlineFor,
+    setEditDeadlineFor,
+    timeFor,
+    setTimeFor,
+    repeatFor,
+    setRepeatFor,
+    tomorrowClickCount,
+    setTomorrowClickCount,
+    dragData: dragDataRef,
+    dragOverTarget,
+    setDragOverTarget,
+    findTaskEverywhere,
+    updateTaskEverywhere,
+    removeTaskEverywhere,
+    removeTaskFromTree,
+    toggleComplete,
+    toggleStar,
+    setTitle,
+    setDetails,
+    setDate,
+    setDueDate,
+    setDueTime,
+    setDueDateAndTime,
+    setRepeat,
+    clearDue,
+    setAssign,
+    deleteTaskById,
+    closeEditing,
+    uploadTaskAttachment,
+    removeTaskAttachment,
+    addTaskToList,
+    addStarredTaskToList,
+    addSubtask,
+    moveTaskToList,
+    moveTaskToNewList,
+    handleTomorrowClick,
+    handleTodayClick,
+    updateList,
+    setSortBy,
+    startRename,
+    commitRename,
+    deleteList,
+    deleteAllCompleted,
+    addList,
+    toggleCompletedSection,
+    dropAssign,
+    promoteToMainTask,
+    indentTask,
+    getTask,
+    fetchTasksForCurrentList,
+    fetchPeople,
+    loadingPeople,
+    handleListGroupChange,
+    handleTaskGroupChange,
+    onSortEnd,
+    onListSortEnd,
+    makeMutable,
+    unmakeMutable,
   };
 };
