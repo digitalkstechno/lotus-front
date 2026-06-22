@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import FCMProvider from "@/components/FCMProvider";
 import Sidebar from "../components/sidebar";
@@ -33,7 +34,9 @@ export default function RootLayout({
       <body className="flex h-screen overflow-hidden">
         <ReduxProvider>
           <AuthGuard>
-            <Sidebar />
+            <Suspense fallback={null}>
+              <Sidebar />
+            </Suspense>
             <main className="flex-1 overflow-y-auto">
                <FCMProvider>
               <ChecklistProvider>
