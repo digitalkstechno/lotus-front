@@ -125,19 +125,7 @@ export default function LoginPage() {
           </div>
 
           {/* Remember / Forgot */}
-          <div className="flex items-center justify-between text-sm">
-            <label className="flex items-center gap-2 text-[#8696A0] cursor-pointer">
-              <input
-                type="checkbox"
-                className="w-4 h-4 rounded accent-[#00A884] bg-[#2A3942] border-[#2A3942]"
-              />
-              Remember me
-            </label>
-            <a href="#" className="text-[#00A884] hover:underline">
-              Forgot password?
-            </a>
-          </div>
-
+          
           {/* Submit */}
           <button
             type="submit"
@@ -148,12 +136,7 @@ export default function LoginPage() {
           </button>
 
           {/* Footer */}
-          <p className="text-center text-sm text-[#8696A0]">
-            Don&apos;t have an account?{" "}
-            <a href="#" className="text-[#00A884] hover:underline">
-              Sign up
-            </a>
-          </p>
+         
         </form>
       </div>
     </div>

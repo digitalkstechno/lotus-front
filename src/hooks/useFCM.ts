@@ -4,7 +4,7 @@
 
 import { useEffect } from "react";
 import { getToken, onMessage } from "firebase/messaging";
-import { messaging } from "@/lib/firebase";
+import { getMessagingInstance } from "@/lib/firebase";
 import { saveFcmTokenApi } from "@/services/userService";
 import { toast } from "sonner";
 import { useSelector } from "react-redux";
@@ -18,6 +18,7 @@ export const requestAndSaveFCMToken = async () => {
       return;
     }
 
+    const messaging = await getMessagingInstance();
     if (!messaging) return;
 
     const currentToken = await getToken(messaging, {
@@ -57,44 +58,48 @@ export default function useFCM() {
     }
 
     // Listen for foreground messages
-    if (messaging) {
-      const unsubscribe = onMessage(messaging, (payload) => {
-        console.log("Foreground Message received:", payload);
-        if (payload.notification) {
-          // Fallback to sonner toast for in-app UI
-          toast(payload.notification.title || "New Notification", {
-            description: payload.notification.body,
-            duration: 5000,
-            icon: "🔔"
-          });
-
-          // Also trigger the native OS notification via Service Worker / Native API
-          try {
-            // First try standard Notification
-            const n = new Notification(payload.notification.title || "New Notification", {
-              body: payload.notification.body,
-              icon: "/favicon.ico"
+    let unsubscribe: any;
+    getMessagingInstance().then((messaging) => {
+      if (messaging) {
+        unsubscribe = onMessage(messaging, (payload) => {
+          console.log("Foreground Message received:", payload);
+          if (payload.notification) {
+            // Fallback to sonner toast for in-app UI
+            toast(payload.notification.title || "New Notification", {
+              description: payload.notification.body,
+              duration: 5000,
+              icon: "🔔"
             });
-            n.onclick = () => window.focus();
-          } catch (e) {
-            // Fallback to Service Worker if standard API is blocked or deprecated
-            if ("serviceWorker" in navigator) {
-              navigator.serviceWorker.getRegistration().then((registration) => {
-                if (registration) {
-                  registration.showNotification(payload.notification!.title || "New Notification", {
-                    body: payload.notification!.body,
-                    icon: "/favicon.ico",
-                    data: payload.data,
-                  });
-                }
+
+            // Also trigger the native OS notification via Service Worker / Native API
+            try {
+              // First try standard Notification
+              const n = new Notification(payload.notification.title || "New Notification", {
+                body: payload.notification.body,
+                icon: "/favicon.ico"
               });
+              n.onclick = () => window.focus();
+            } catch (e) {
+              // Fallback to Service Worker if standard API is blocked or deprecated
+              if ("serviceWorker" in navigator) {
+                navigator.serviceWorker.getRegistration().then((registration) => {
+                  if (registration) {
+                    registration.showNotification(payload.notification!.title || "New Notification", {
+                      body: payload.notification!.body,
+                      icon: "/favicon.ico",
+                      data: payload.data,
+                    });
+                  }
+                });
+              }
             }
           }
-        }
-      });
-      return () => {
-        unsubscribe(); // Clean up listener
-      };
-    }
+        });
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe(); // Clean up listener
+    };
   }, [isAuthenticated]);
 }
