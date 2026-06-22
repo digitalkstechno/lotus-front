@@ -8,6 +8,7 @@ import AuthGuard from "@/components/AuthGuard";
 import { ChecklistProvider } from "./checklist/context";
 import ReduxProvider from "@/redux/ReduxProvider";
 import { Toaster } from "sonner";
+import SidebarLayout from "@/components/SidebarLayout";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
