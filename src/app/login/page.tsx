@@ -41,7 +41,8 @@ export default function LoginPage() {
         requestAndSaveFCMToken();
 
         const role = response.data.data?.role;
-        router.push(role?.toLowerCase() === "admin" ? "/staff" : "/task");
+        // router.push(role?.toLowerCase() === "admin" ? "/staff" : "/task");
+        router.push("/task");
       } else {
         toast.error("Invalid credentials. Please try again.");
       }

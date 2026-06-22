@@ -53,7 +53,9 @@ const getVisibleNav = (role?: string) => {
   if (r === "unit_head" || r === "team_head") {
     return PRIMARY_NAV.filter((item) => !ADMIN_ONLY_IDS.includes(item.id));
   }
-  return PRIMARY_NAV.filter((item) => !ADMIN_ONLY_IDS.includes(item.id) && item.id !== "staff");
+  return PRIMARY_NAV.filter(
+    (item) => !ADMIN_ONLY_IDS.includes(item.id) && item.id !== "staff",
+  );
 };
 
 const getTokenPayload = (): UserInfo | null => {
@@ -92,6 +94,11 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
   const [showNewListModal, setShowNewListModal] = useState(false);
 
   useEffect(() => {
+    if (pathname === "/") {
+      router.replace("/task");
+      return;
+    }
+
     const payload = getTokenPayload();
     if (!payload?.id) return;
     setUserInfo(payload);
