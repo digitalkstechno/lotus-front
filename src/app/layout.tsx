@@ -36,16 +36,15 @@ export default function RootLayout({
         <ReduxProvider>
           <AuthGuard>
             <Suspense fallback={null}>
-              <Sidebar />
+              <SidebarLayout>
+                <FCMProvider>
+                  <ChecklistProvider>
+                    {children}
+                    <Toaster position="top-right" richColors />
+                  </ChecklistProvider>
+                </FCMProvider>
+              </SidebarLayout>
             </Suspense>
-            <main className="flex-1 overflow-y-auto">
-               <FCMProvider>
-              <ChecklistProvider>
-                {children}
-                <Toaster position="top-right" richColors />
-              </ChecklistProvider>
-               </FCMProvider>
-            </main>
           </AuthGuard>
         </ReduxProvider>
       </body>
