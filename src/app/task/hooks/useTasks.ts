@@ -176,7 +176,7 @@ export const useTasks = () => {
           fetchListsByUser({
             userId,
             page: pageToFetch,
-            limit: 10,
+            limit: 100,
             isChecked: true,
           }) as any,
         );
@@ -939,11 +939,6 @@ export const useTasks = () => {
     payload: any,
     fromListId?: string | null,
   ) => {
-    console.log("[DnD] syncSortToBackend CALLED", {
-      taskId,
-      payload,
-      fromListId,
-    });
     if (taskId.length < 24) return;
     try {
       await updateTaskApi(taskId, payload);
@@ -973,7 +968,6 @@ export const useTasks = () => {
   };
 
   const onSortEnd = (evt: any) => {
-    console.log("[DnD] ====== onSortEnd FIRED ======");
     const taskId = evt.item?.dataset?.taskId;
 
     const fromWrapper = evt.from?.closest?.("[data-list-id]");
@@ -1029,18 +1023,7 @@ export const useTasks = () => {
       const prevItem = newItems[evt.newIndex - 1];
       const nextItem = newItems[evt.newIndex + 1];
 
-      console.log("[useTasks onSortEnd] isAlreadyUpdated:", isAlreadyUpdated);
-      console.log("[useTasks onSortEnd] prevItem:", prevItem);
-      console.log("[useTasks onSortEnd] nextItem:", nextItem);
-      console.log(
-        "[useTasks onSortEnd] prevRank:",
-        prevItem?.rank,
-        "nextRank:",
-        nextItem?.rank,
-      );
-
       const newRank = getRankBetween(prevItem?.rank, nextItem?.rank);
-      console.log("[useTasks onSortEnd] Calculated newRank:", newRank);
 
       // Local state update is handled by handleTaskGroupChange automatically if same container
       // but if we are moving, we might need a Redux refresh.
@@ -1078,27 +1061,42 @@ export const useTasks = () => {
   // };
 
   const onListSortEnd = (evt: any) => {
+    const listId = evt.item?.dataset?.listId;
+    if (!listId) return;
+
     const currentLists = store.getState().lists.lists;
-    const newLists = [...currentLists];
-    const [movedList] = newLists.splice(evt.oldIndex, 1);
-    newLists.splice(evt.newIndex, 0, movedList);
+    let newLists = [...currentLists];
+    
+    // Check if the array is already updated by setList
+    const isAlreadyUpdated = newLists[evt.newIndex]?.id === listId;
 
-    const prevItem = newLists[evt.newIndex - 1];
-    const nextItem = newLists[evt.newIndex + 1];
+    if (!isAlreadyUpdated) {
+      const [movedList] = newLists.splice(evt.oldIndex, 1);
+      newLists.splice(evt.newIndex, 0, movedList);
+    }
 
-    const { getRankBetween } = require("../lib/lexoRank");
-    const newRank = getRankBetween(prevItem?.rank, nextItem?.rank);
+    const movedList = newLists[evt.newIndex];
+    if (!movedList) return;
+
+    // To auto-heal empty ("") ranks in the database, we assign fresh LexoRanks 
+    // to ALL lists based on their new visual order and bulk update the backend.
+    const { LexoRank } = require("lexorank");
+    let currentLexo = LexoRank.middle();
+
+    const updatedListsForBackend = newLists.map((l: any, idx: number) => {
+      const rankStr = currentLexo.toString();
+      currentLexo = currentLexo.genNext();
+      return { id: l.id, rank: rankStr, order: idx };
+    });
 
     // Update local Redux state immediately (optimistic)
     setLists(
-      newLists.map((l: any) =>
-        l.id === movedList.id ? { ...l, rank: newRank } : l,
-      ),
+      newLists.map((l: any, i: number) => ({ ...l, rank: updatedListsForBackend[i].rank }))
     );
 
-    // Persist to backend via reorder API
-    reorderListsApi([{ id: movedList.id, rank: newRank } as any]).catch(
-      console.error,
+    // Persist to backend via reorder API (bulk update heals all empty ranks)
+    reorderListsApi(updatedListsForBackend).catch(
+      (err) => console.error("Failed to reorder lists on backend", err),
     );
   };
 

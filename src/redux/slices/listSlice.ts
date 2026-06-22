@@ -4,9 +4,9 @@ import { getTasksByListAndUserApi } from "../../services/taskService";
 
 export const fetchListsByUser = createAsyncThunk(
   "lists/fetchByUser",
-  async ({ userId, page = 1, limit = 10, isChecked }: { userId: string, page?: number, limit?: number, isChecked?: boolean }, { rejectWithValue }) => {
+  async ({ userId, page = 1, limit = 10, isChecked, sortBy = "rank" }: { userId: string, page?: number, limit?: number, isChecked?: boolean, sortBy?: string }, { rejectWithValue }) => {
     try {
-      const response = await listApi.getListsByUserApi(userId, page, limit, isChecked);
+      const response = await listApi.getListsByUserApi(userId, page, limit, isChecked, sortBy);
       // The backend returns: { status: "Success", pagination: {...}, data: [...] }
       const resData = response.data;
       let fetchedData = [];
@@ -162,19 +162,17 @@ const listSlice = createSlice({
     });
     builder.addCase(fetchListsByUser.fulfilled, (state, action) => {
       state.loading = false;
-      console.log("listSlice - fetchListsByUser.fulfilled - action.payload:", action.payload);
       const { data, page, totalPages } = action.payload;
 
       const formattedLists = data.map((l: any) => ({
         ...l,
         id: l._id || l.id,
         name: l.name || "Unnamed List",
+        rank: l.rank || "", // Ensure rank exists
         sortBy: "my-order",
         tasks: [], // Prepare empty tasks array for UI
         taskPagination: { currentPage: 1, totalPages: 1, hasMore: true, loading: false }
       }));
-
-      console.log("listSlice - fetchListsByUser.fulfilled - formattedLists:", formattedLists);
 
       if (page === 1) {
         state.lists = formattedLists;
@@ -184,8 +182,6 @@ const listSlice = createSlice({
         const newLists = formattedLists.filter(l => !existingIds.has(l.id));
         state.lists = [...state.lists, ...newLists];
       }
-
-      console.log("listSlice - Updated state.lists:", JSON.parse(JSON.stringify(state.lists)));
       state.currentPage = page;
       state.totalPages = totalPages;
       state.hasMore = page < totalPages;

@@ -61,8 +61,6 @@ function AppContent() {
     unmakeMutable,
   } = useTasks() as any;
 
-  console.log("AppContent Rendered - lists from useTasks:", lists);
-
   useEffect(() => {
     if (userId) {
       dispatch(resetLists());
@@ -70,7 +68,7 @@ function AppContent() {
         fetchListsByUser({
           userId,
           page: 1,
-          limit: 10,
+          limit: 100,
           isChecked: true,
         }) as any,
       );
@@ -128,17 +126,9 @@ function AppContent() {
       </div>
 
       <div className="p-5 flex gap-4 overflow-x-auto items-start min-h-[calc(100vh-72px)]">
-        {/* <ReactSortable
-          list={makeMutable(lists)}
-          setList={(newLists) => handleListGroupChange(unmakeMutable(newLists))}
-          onEnd={onListSortEnd}
-          handle=".list-drag-handle"
-          animation={150}
-          className="flex gap-4 items-start"
-        > */}
         <ReactSortable
           list={makeMutable(lists)}
-          setList={() => {}}
+          setList={(newLists) => handleListGroupChange(unmakeMutable(newLists))}
           onEnd={onListSortEnd}
           handle=".list-drag-handle"
           animation={150}
