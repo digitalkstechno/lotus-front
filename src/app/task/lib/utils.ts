@@ -13,6 +13,7 @@ export const newTask = (title = "") => ({
   assign: null,
   attachments: [],
   subtasks: [],
+  order: 0,
   createdAt: Date.now(),
 });
 

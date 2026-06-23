@@ -16,6 +16,7 @@ export const CalendarPicker = ({
   onSetTime?: any;
   onSetRepeat?: any;
   onDelete?: any;
+  showTimeOption?: boolean;
 }) => {
   const today = new Date();
   let initDate = today;

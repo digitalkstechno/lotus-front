@@ -1,8 +1,8 @@
 import axiosInstance from "../utils/axios";
 
-// GET /task/list/:list_id/user/:user_id
-export const getTasksByListAndUserApi = (listId: string, userId: string, page = 1, limit = 20, sortBy?: string) => {
-  return axiosInstance.get(`/task/list/${listId}/user/${userId}`, { params: { page, limit, sortBy } });
+// GET /task/assigned-to-user/:user_id
+export const getTasksByUserApi = (userId: string, page = 1, limit = 20, sortBy?: string, isStarred?: boolean) => {
+  return axiosInstance.get(`/task/assigned-to-user/${userId}`, { params: { page, limit, sortBy, isStarred } });
 };
 
 // GET /task/starred/user/:user_id  — paginated starred tasks for the logged-in user

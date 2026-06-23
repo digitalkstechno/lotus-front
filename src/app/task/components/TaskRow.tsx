@@ -1,72 +1,22 @@
 import React from "react";
 import {
-  Circle, CheckCircle2, ChevronDown, ChevronRight, GripVertical, Clock, Plus, X, Check,
-  Building2, Users, User as UserIcon, ListChecks, MoreVertical, Star, ArrowLeftRight,
-  AlignLeft, CirclePlus, Target, CornerDownRight, Paperclip, Trash2, ListPlus, Pencil, Printer, RefreshCw, Eye, Download
+  Circle, CheckCircle2, GripVertical, Clock, X, Check,
+  Target, CornerDownRight, Paperclip, Trash2, ArrowLeftRight,
+  AlignLeft, RefreshCw, Eye, Download, Star, MoreVertical
 } from "lucide-react";
 import { useTasks } from "../hooks/useTasks";
 import { formatDueLabel, newTask, uid, formatDate, isPastDate } from "../lib/utils";
-import { MONTHS, ASSIGN_COLORS } from "../lib/constants";
-import { Overlay, MenuItem, ListPicker, AssignChip } from "./Shared";
+import { ASSIGN_COLORS } from "../lib/constants";
+import { Overlay, MenuItem } from "./Shared";
 import { ReactSortable } from "react-sortablejs";
 
-// ── List picker used by the Starred page (rendered inside expanded TaskRow) ──
-function StarredListPicker({ lists, currentListId, onSelect }: { lists: any[]; currentListId: string; onSelect: (id: string, name: string) => void }) {
-  const [open, setOpen] = React.useState(false);
-  const ref = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
-
-  const current = lists.find((l: any) => l.id === currentListId);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); setOpen(p => !p); }}
-        className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 w-full cursor-pointer transition-colors ${open ? "border-emerald-500 bg-emerald-50" : "border-dashed border-gray-200 hover:border-emerald-400"}`}
-      >
-        <span className="text-xs text-gray-400 flex-shrink-0">List</span>
-        <span className="flex-1 text-xs text-gray-700 truncate text-left">{current?.name || "Select list"}</span>
-        <ChevronDown size={12} className={`text-gray-400 transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {open && (
-        <div
-          className="absolute left-0 bottom-full mb-1 w-full bg-white rounded-xl border border-gray-200 shadow-xl py-1 z-[200] max-h-48 overflow-y-auto"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {lists.map((l: any) => (
-            <button
-              key={l.id}
-              onClick={() => { onSelect(l.id, l.name); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-emerald-50 transition-colors text-gray-700"
-            >
-              <span className="w-4 flex-shrink-0">
-                {l.id === currentListId && <Check size={13} className="text-emerald-500" />}
-              </span>
-              <span className="truncate">{l.name}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChange }: any) => {
+export const TaskRow = ({ task: taskProp, parentId, depth = 0 }: any) => {
   const {
     editingTaskId, setEditingTaskId, dragOverTarget, setDragOverTarget, tomorrowClickCount,
-    setTomorrowClickCount, openTaskMenu, setOpenTaskMenu, openMovePicker, setOpenMovePicker,
-    openAssignFor, setOpenAssignFor, openAttFor, setOpenAttFor, orgPeople, lists, setLists,
+    setTomorrowClickCount, openTaskMenu, setOpenTaskMenu,
+    openAssignFor, setOpenAssignFor, openAttFor, setOpenAttFor, orgPeople,
     findTaskEverywhere, toggleComplete, toggleStar, setTitle, setDetails, setCalendarFor,
-    setEditDeadlineFor, setRepeatFor, setAssign, deleteTaskById, moveTaskToList, moveTaskToNewList,
+    setEditDeadlineFor, setRepeatFor, setAssign, deleteTaskById,
     handleTomorrowClick, handleTodayClick,
     updateTaskEverywhere, indentTask, promoteToMainTask, dragData, fetchPeople, loadingPeople, setDate, clearDue, uploadTaskAttachment, removeTaskAttachment,
     handleTaskGroupChange, onSortEnd, makeMutable, unmakeMutable
@@ -78,7 +28,6 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChang
   const task = findTaskEverywhere(taskProp.id)?.task || taskProp;
   const isEditing = editingTaskId === task.id;
   const isDragOver = dragOverTarget?.kind === "task-target" && dragOverTarget.id === task.id;
-  const tomorrowCount = tomorrowClickCount[task.id] || 0;
   const dueLabel = formatDueLabel(task);
 
   const renderPendingFileModal = () => {
@@ -175,41 +124,6 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChang
               onChange={(e) => setTitle(task.id, e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); return; }
-                if (e.key === "Tab") {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (e.shiftKey) {
-                    setLists((prev: any) => {
-                      const found = findTaskEverywhere(task.id, prev);
-                      if (!found || !found.parentId) return prev;
-                      return prev.map((l: any) => {
-                        if (l.id !== found.listId) return l;
-                        const pIdx = l.tasks.findIndex((t: any) => t.id === found.parentId);
-                        if (pIdx === -1) return l;
-                        const taskCopy = { ...found.task, subtasks: found.task.subtasks || [] };
-                        const newTasks = [...l.tasks.map((t: any) => t.id === found.parentId ? { ...t, subtasks: t.subtasks.filter((s: any) => s.id !== task.id) } : t)];
-                        newTasks.splice(pIdx + 1, 0, taskCopy);
-                        return { ...l, tasks: newTasks };
-                      });
-                    });
-                  } else {
-                    setLists((prev: any) => {
-                      const found = findTaskEverywhere(task.id, prev);
-                      if (!found || found.parentId) return prev;
-                      return prev.map((l: any) => {
-                        if (l.id !== found.listId) return l;
-                        const idx = l.tasks.findIndex((t: any) => t.id === task.id);
-                        if (idx <= 0) return l;
-                        const newParent = l.tasks[idx - 1];
-                        if (newParent.completed) return l;
-                        const taskCopy = { ...l.tasks[idx], subtasks: [] };
-                        return { ...l, tasks: l.tasks.filter((_: any, i: number) => i !== idx).map((t: any) => t.id === newParent.id ? { ...t, subtasks: [...t.subtasks, taskCopy] } : t) };
-                      });
-                    });
-                  }
-                  setEditingTaskId(null);
-                  return;
-                }
               }}
               placeholder="Title"
               className={`flex-1 text-sm bg-transparent focus:outline-none border-b border-emerald-500 pb-0.5 ${task.completed ? "text-gray-400 line-through" : "text-gray-800"}`}
@@ -243,12 +157,10 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChang
                       <div className="fixed w-56 bg-white rounded-lg shadow-lg border border-gray-100 z-[60]" style={menuCoords} onClick={(e) => e.stopPropagation()}>
                         <div className="py-1">
                           <MenuItem icon={Target} onClick={() => { setEditDeadlineFor(task.id); setOpenTaskMenu(null); }}>Add deadline</MenuItem>
-                          <MenuItem icon={CornerDownRight} onClick={() => indentTask(task.id, list.id)}>Indent</MenuItem>
-                          <MenuItem icon={CornerDownRight} onClick={() => { const sub = newTask(""); updateTaskEverywhere(task.id, (t: any) => ({ ...t, subtasks: [...t.subtasks, sub] })); setEditingTaskId(sub.id); setOpenTaskMenu(null); }}>Add a subtask</MenuItem>
+                          <MenuItem icon={CornerDownRight} onClick={() => indentTask(task.id)}>Indent</MenuItem>
+                          <MenuItem icon={CornerDownRight} onClick={() => { const sub = newTask(""); updateTaskEverywhere(task.id, (t: any) => ({ ...t, subtasks: [sub, ...(t.subtasks || [])] })); setEditingTaskId(sub.id); setOpenTaskMenu(null); }}>Add a subtask</MenuItem>
                           <MenuItem icon={Paperclip} onClick={() => { setOpenTaskMenu(null); document.getElementById(`att-input-${task.id}`)?.click(); }}>Add attachment</MenuItem>
                           <MenuItem icon={Trash2} danger onClick={() => { deleteTaskById(task.id); setOpenTaskMenu(null); }}>Delete</MenuItem>
-                          <div className="border-t border-gray-100 my-1" />
-                          <ListPicker lists={lists} currentListId={list.id} onPick={(toId: string) => moveTaskToList(task.id, parentId, toId)} onNewList={(name: string) => moveTaskToNewList(task.id, parentId, name)} />
                         </div>
                       </div>
                     </>
@@ -281,66 +193,68 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChang
                 <button onClick={() => setEditDeadlineFor(task.id)} className="p-1.5 rounded-full border bg-white text-gray-500 border-gray-200 hover:border-emerald-500 hover:text-emerald-500 transition-colors" title="Add deadline"><Target size={14} /></button>
                 <button onClick={() => setRepeatFor(task.id)} className={`p-1.5 rounded-full border transition-colors ${task.repeat?.enabled ? "bg-emerald-500 text-white border-emerald-500" : "bg-white text-gray-500 border-gray-200 hover:border-emerald-500 hover:text-emerald-500"}`} title="Repeat"><RefreshCw size={14} /></button>
               </div>
-              {depth === 0 && (
-                <div className="relative">
-                  {openMovePicker === task.id && (
-                    <>
-                      <Overlay onClose={() => setOpenMovePicker(null)} />
-                      <div className="absolute right-0 mt-1 w-52 bg-white rounded-lg shadow-lg border border-gray-100 z-50">
-                        <p className="px-3 pt-2 pb-1 text-xs text-gray-400">Move to list</p>
-                        <ListPicker lists={lists} currentListId={list.id} onPick={(toId: string) => moveTaskToList(task.id, parentId, toId)} onNewList={(name: string) => moveTaskToNewList(task.id, parentId, name)} />
-                      </div>
-                    </>
-                  )}
+            </div>
+            <input type="text" value={task.details} onChange={(e) => setDetails(task.id, e.target.value)} placeholder="Add details..." className="w-full text-sm bg-transparent focus:outline-none border-b border-gray-200 focus:border-emerald-500 pb-0.5 text-gray-600 placeholder-gray-300" />
+            
+            <div className="flex gap-4">
+              <div className="relative flex-1">
+                <div onClick={(e) => {
+                  if (openAssignFor !== task.id) fetchPeople();
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const spaceBelow = window.innerHeight - rect.bottom;
+                  const style: any = { left: rect.left, overflowY: "auto" };
+                  if (spaceBelow < 250) {
+                    style.bottom = window.innerHeight - rect.top + 4;
+                    style.maxHeight = rect.top - 16;
+                  } else {
+                    style.top = rect.bottom + 4;
+                    style.maxHeight = spaceBelow - 16;
+                  }
+                  setMenuCoords(style);
+                  setOpenAssignFor(openAssignFor === task.id ? null : task.id);
+                }} className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 w-full cursor-pointer transition-colors ${openAssignFor === task.id ? "border-emerald-500 bg-emerald-50" : "border-dashed border-gray-200 hover:border-emerald-400"}`}>
+                  <span className="text-xs text-gray-400 flex-shrink-0">Assigned To</span>
+                  {task.assign ? (
+                    <span className={`inline-flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium border ${ASSIGN_COLORS[task.assign.role] || "bg-gray-50 text-gray-700 border-gray-200"}`}>
+                      {task.assign.name}<span className="text-[10px] opacity-60">{task.assign.role}</span>
+                      <button onClick={(e) => { e.stopPropagation(); setAssign(task.id, null); }} className="ml-0.5 rounded-full hover:bg-black/10 p-0.5"><X size={11} /></button>
+                    </span>
+                  ) : <span className="text-xs text-gray-300">Select a person</span>}
+                </div>
+                {openAssignFor === task.id && (
+                  <>
+                    <Overlay onClose={() => setOpenAssignFor(null)} />
+                    <div className="fixed w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-[60] overflow-hidden flex flex-col" style={menuCoords}>
+                      {loadingPeople ? (
+                        <p className="px-3 py-3 text-xs text-gray-400 italic">Loading staff...</p>
+                      ) : orgPeople.length === 0 ? (
+                        <p className="px-3 py-3 text-xs text-gray-400 italic">No staff found. Add staff first.</p>
+                      ) : (
+                        <div style={{ maxHeight: '150px', overflowY: 'auto' }} className="py-1">
+                          {orgPeople.map((p: any) => (
+                            <button key={p.id} onClick={() => { setAssign(task.id, { id: p.id, name: p.name, role: p.role }); setOpenAssignFor(null); }} className="w-full flex items-center justify-between px-3 py-2 hover:bg-emerald-50 transition-colors">
+                              <span className="text-xs font-medium text-gray-800">{p.name}</span><span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${ASSIGN_COLORS[p.role]}`}>{p.role}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {task.assignBy && (
+                <div className="flex-1">
+                  <div className={`flex items-center gap-2 rounded-md border border-gray-200 px-2.5 py-1.5 w-full bg-gray-50/50`}>
+                    <span className="text-xs text-gray-400 flex-shrink-0">Assigned By</span>
+                    <span className={`inline-flex items-center gap-1.5 pl-2 pr-2 py-0.5 rounded-full text-xs font-medium border bg-white text-gray-700 border-gray-200`}>
+                      {task.assignBy.name}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
-            <input type="text" value={task.details} onChange={(e) => setDetails(task.id, e.target.value)} placeholder="Add details..." className="w-full text-sm bg-transparent focus:outline-none border-b border-gray-200 focus:border-emerald-500 pb-0.5 text-gray-600 placeholder-gray-300" />
-            <div className="relative">
-              <div onClick={(e) => {
-                if (openAssignFor !== task.id) fetchPeople();
-                const rect = e.currentTarget.getBoundingClientRect();
-                const spaceBelow = window.innerHeight - rect.bottom;
-                const style: any = { left: rect.left, overflowY: "auto" };
-                if (spaceBelow < 250) {
-                  style.bottom = window.innerHeight - rect.top + 4;
-                  style.maxHeight = rect.top - 16;
-                } else {
-                  style.top = rect.bottom + 4;
-                  style.maxHeight = spaceBelow - 16;
-                }
-                setMenuCoords(style);
-                setOpenAssignFor(openAssignFor === task.id ? null : task.id);
-              }} className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 w-full cursor-pointer transition-colors ${openAssignFor === task.id ? "border-emerald-500 bg-emerald-50" : "border-dashed border-gray-200 hover:border-emerald-400"}`}>
-                <span className="text-xs text-gray-400 flex-shrink-0">Assign to</span>
-                {task.assign ? (
-                  <span className={`inline-flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium border ${ASSIGN_COLORS[task.assign.role] || "bg-gray-50 text-gray-700 border-gray-200"}`}>
-                    {task.assign.name}<span className="text-[10px] opacity-60">{task.assign.role}</span>
-                    <button onClick={(e) => { e.stopPropagation(); setAssign(task.id, null); }} className="ml-0.5 rounded-full hover:bg-black/10 p-0.5"><X size={11} /></button>
-                  </span>
-                ) : <span className="text-xs text-gray-300">Select a person</span>}
-              </div>
-              {openAssignFor === task.id && (
-                <>
-                  <Overlay onClose={() => setOpenAssignFor(null)} />
-                  <div className="fixed w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-[60] overflow-hidden flex flex-col" style={menuCoords}>
-                    {loadingPeople ? (
-                      <p className="px-3 py-3 text-xs text-gray-400 italic">Loading staff...</p>
-                    ) : orgPeople.length === 0 ? (
-                      <p className="px-3 py-3 text-xs text-gray-400 italic">No staff found. Add staff first.</p>
-                    ) : (
-                      <div style={{ maxHeight: '150px', overflowY: 'auto' }} className="py-1">
-                        {orgPeople.map((p: any) => (
-                          <button key={p.id} onClick={() => { setAssign(task.id, { id: p.id, name: p.name, role: p.role }); setOpenAssignFor(null); }} className="w-full flex items-center justify-between px-3 py-2 hover:bg-emerald-50 transition-colors">
-                            <span className="text-xs font-medium text-gray-800">{p.name}</span><span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${ASSIGN_COLORS[p.role]}`}>{p.role}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+
             {(task.attachments || []).length > 0 && (
               <div className="relative" onClick={(e) => e.stopPropagation()}>
                 <button onClick={(e) => {
@@ -352,12 +266,6 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChang
               </div>
             )}
           </div>
-          {/* List picker — shown only in starred/special context when onListChange is provided */}
-          {onListChange && (
-            <div className="ml-9 mt-2">
-              <StarredListPicker lists={lists} currentListId={list.id} onSelect={(id, name) => onListChange(id, name, task.id)} />
-            </div>
-          )}
         </div>
         {renderPendingFileModal()}
         {renderAttachmentsModal()}
@@ -379,7 +287,7 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChang
         </div>
         <div className="flex-1 min-w-0">
           <p className={`text-[13px] leading-snug ${task.completed ? "text-gray-400 line-through" : "text-gray-800 font-medium"}`}>{task.title}</p>
-          {(task.date || task.dueDate || task.assign || task.subtasks?.length > 0 || task.details || task.attachments?.length > 0) && (
+          {(task.date || task.dueDate || task.assign || task.assignBy || task.subtasks?.length > 0 || task.details || task.attachments?.length > 0) && (
             <div className="flex flex-wrap items-center gap-1.5 mt-1">
               {task.details && <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 flex items-center gap-1"><AlignLeft size={11} /> Details</span>}
               {task.date && (
@@ -399,6 +307,16 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChang
                 }`}>
                   <Target size={10} className={isPastDate(task.dueDate) ? "text-red-500" : "text-gray-400"} />
                   Due {dueLabel}
+                </span>
+              )}
+              {task.assign && (
+                <span className={`text-[11px] px-2 py-0.5 rounded-full capitalize flex items-center gap-1 border bg-blue-50 text-blue-700 border-blue-200`}>
+                  To: {task.assign.name}
+                </span>
+              )}
+              {task.assignBy && (
+                <span className={`text-[11px] px-2 py-0.5 rounded-full capitalize flex items-center gap-1 border bg-purple-50 text-purple-700 border-purple-200`}>
+                  By: {task.assignBy.name}
                 </span>
               )}
               {task.repeat?.enabled && (
@@ -456,23 +374,19 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChang
                           const sub = newTask("");
                           (sub as any).isNew = true;
                           sub.order = task.subtasks?.length || 0;
-                          updateTaskEverywhere(task.id, (t: any) => ({ ...t, subtasks: [...t.subtasks, sub] }));
+                          updateTaskEverywhere(task.id, (t: any) => ({ ...t, subtasks: [sub, ...(t.subtasks || [])] }));
                           setEditingTaskId(sub.id);
                           setOpenTaskMenu(null);
                         }}>Add a subtask</MenuItem>
-                        <MenuItem icon={CornerDownRight} onClick={() => { indentTask(task.id, list.id); setOpenTaskMenu(null); }}>Indent</MenuItem>
+                        <MenuItem icon={CornerDownRight} onClick={() => { indentTask(task.id); setOpenTaskMenu(null); }}>Indent</MenuItem>
                         <MenuItem icon={Paperclip} onClick={() => { setOpenTaskMenu(null); document.getElementById(`att-input-${task.id}`)?.click(); }}>Add attachment</MenuItem>
                         <MenuItem icon={Trash2} danger onClick={() => { deleteTaskById(task.id); setOpenTaskMenu(null); }}>Delete</MenuItem>
-                        <div className="border-t border-gray-100 my-1" />
-                        <ListPicker lists={lists} currentListId={list.id} onPick={(toId: string) => moveTaskToList(task.id, parentId, toId)} onNewList={(name: string) => moveTaskToNewList(task.id, parentId, name)} />
                       </>
                     ) : (
                       <>
-                        <MenuItem icon={ArrowLeftRight} onClick={() => { promoteToMainTask(task.id, parentId, list.id); setOpenTaskMenu(null); }}>Make main task</MenuItem>
+                        <MenuItem icon={ArrowLeftRight} onClick={() => { promoteToMainTask(task.id, parentId); setOpenTaskMenu(null); }}>Make main task</MenuItem>
                         <MenuItem icon={Paperclip} onClick={() => { setOpenTaskMenu(null); document.getElementById(`att-input-${task.id}`)?.click(); }}>Add attachment</MenuItem>
                         <MenuItem icon={Trash2} danger onClick={() => { deleteTaskById(task.id); setOpenTaskMenu(null); }}>Delete</MenuItem>
-                        <div className="border-t border-gray-100 my-1" />
-                        <ListPicker lists={lists} currentListId={list.id} onPick={(toId: string) => moveTaskToList(task.id, parentId, toId)} onNewList={(name: string) => moveTaskToNewList(task.id, parentId, name)} />
                       </>
                     )}
                   </div>
@@ -483,15 +397,13 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChang
         </div>
       </div>
       {depth === 0 && (
-        /* Wrapper div carries list/parent context for onSortEnd via closest() */
-        /* Always rendered so tasks with 0 subtasks still have a droppable zone */
-        <div data-list-id={list.id} data-parent-id={task.id}>
+        <div data-parent-id={task.id}>
           <ReactSortable
             list={makeMutable((task.subtasks || []).filter((s: any) => task.completed ? s.completed : !s.completed))}
             setList={(newSubtasks) => {
                const plainSubtasks = unmakeMutable(newSubtasks);
                const otherSubtasks = (task.subtasks || []).filter((s: any) => task.completed ? !s.completed : s.completed);
-               handleTaskGroupChange(list.id, task.id, [...plainSubtasks, ...otherSubtasks]);
+               handleTaskGroupChange(task.id, [...plainSubtasks, ...otherSubtasks]);
             }}
             group="shared"
             onEnd={onSortEnd}
@@ -504,7 +416,7 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChang
             }`}
           >
             {(task.subtasks || []).filter((s: any) => task.completed ? s.completed : !s.completed).map((sub: any) => (
-              <TaskRow key={sub.id} list={list} task={sub} parentId={task.id} depth={1} />
+              <TaskRow key={sub.id} task={sub} parentId={task.id} depth={1} />
             ))}
           </ReactSortable>
         </div>
@@ -515,4 +427,3 @@ export const TaskRow = ({ list, task: taskProp, parentId, depth = 0, onListChang
     </div>
   );
 };
-
