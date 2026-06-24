@@ -50,8 +50,8 @@ export default function LoginPage() {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         {/* Header */}
         <div className="bg-emerald-700 px-8 py-8 flex flex-col items-center text-center">
-          <div className="w-13 h-13 rounded-xl bg-white flex items-center justify-center mb-3">
-            <MessageSquare className="w-7 h-7 text-emerald-700" />
+          <div className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center mb-3 p-2 shadow-sm overflow-hidden">
+            <img src="/splash_logo.png" alt="Lotus Logo" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-white text-xl font-semibold">Lotus</h1>
           <p className="text-emerald-100 text-sm mt-1">
