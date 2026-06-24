@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { uid, newTask } from "../lib/utils";
@@ -69,6 +69,14 @@ export const useTasks = () => {
     } catch (e) {}
   }
 
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (userId && !selectedUserId) {
+      setSelectedUserId(userId);
+    }
+  }, [userId, selectedUserId]);
+
   const {
     tasks,
     loading: loadingTasks,
@@ -109,13 +117,14 @@ export const useTasks = () => {
   const dragDataRef = useRef<any>(null);
 
   const fetchTasks = useCallback((page = 1, sortBy?: string, isStarred?: boolean) => {
-    if (userId) {
+    const targetId = selectedUserId || userId;
+    if (targetId) {
       if (page === 1) {
          dispatch(resetTasks());
       }
-      dispatch(fetchTasksByUser({ userId, page, limit: 20, sortBy, isStarred }) as any);
+      dispatch(fetchTasksByUser({ userId: targetId, page, limit: 20, sortBy, isStarred }) as any);
     }
-  }, [userId, dispatch]);
+  }, [userId, selectedUserId, dispatch]);
 
   const loadMoreTasks = useCallback(() => {
     if (!loadingTasks && hasMore) {
@@ -687,6 +696,8 @@ export const useTasks = () => {
     tasks,
     setTasks,
     orgPeople,
+    selectedUserId,
+    setSelectedUserId,
     loadingTasks,
     hasMore,
     openAssignFor,

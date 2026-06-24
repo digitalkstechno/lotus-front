@@ -36,14 +36,22 @@ function AppContent() {
     setRepeat,
     setDate,
     fetchTasks,
+    orgPeople,
+    fetchPeople,
+    selectedUserId,
+    setSelectedUserId,
   } = useTasks();
 
   const [sortBy, setSortByLocal] = useState("my-order");
   const [openSortMenu, setOpenSortMenu] = useState(false);
 
   useEffect(() => {
+    fetchPeople();
+  }, [fetchPeople]);
+
+  useEffect(() => {
     fetchTasks(1, sortBy);
-  }, [fetchTasks, sortBy]);
+  }, [fetchTasks, sortBy, selectedUserId]);
 
   const handleSortChange = (newSort: string) => {
     setSortByLocal(newSort);
@@ -70,6 +78,23 @@ function AppContent() {
             <p className="text-[11px] opacity-80 mt-0.5">Manage your tasks and subtasks</p>
           </div>
         </div>
+
+        {orgPeople && orgPeople.length > 1 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm">View tasks of:</span>
+            <select
+              value={selectedUserId || ""}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+              className="bg-emerald-800 text-white border border-emerald-600 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
+            >
+              {orgPeople.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.name} ({person.role})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         
       </div>
 
