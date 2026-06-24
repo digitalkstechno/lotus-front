@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { getToken, onMessage } from "firebase/messaging";
+import { getToken, onMessage, deleteToken } from "firebase/messaging";
 import { getMessagingInstance } from "@/lib/firebase";
 import { saveFcmTokenApi } from "@/services/userService";
 import { toast } from "sonner";
@@ -55,6 +55,19 @@ export default function useFCM() {
   useEffect(() => {
     if (isAuthenticated) {
       requestAndSaveFCMToken();
+    } else {
+      // If user is logged out locally (e.g. token cleared), delete the FCM token
+      // This invalidates it with Firebase so no more background push notifications arrive here
+      getMessagingInstance().then((messaging) => {
+        if (messaging) {
+          deleteToken(messaging).then(() => {
+            console.log("FCM Token deleted locally because user is not authenticated.");
+            localStorage.removeItem("fcm_token");
+          }).catch(err => {
+            console.log("Failed to delete FCM token locally", err);
+          });
+        }
+      }).catch(console.error);
     }
 
     // Listen for foreground messages
